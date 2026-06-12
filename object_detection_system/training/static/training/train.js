@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const datasetYamlSelect = document.getElementById('dataset_yaml');
     const datasetYamlFullpath = document.getElementById('dataset_yaml_fullpath');
     const dataTypeSelect = document.getElementById('data_type');
+    const trainingEndpoint = window.location.pathname || '/training/';
 
     function selectedProjectName() {
         if (!projectSelect || projectSelect.selectedIndex < 0) {
@@ -121,14 +122,21 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         const formData = new FormData(form);
-        fetch('', {
+        fetch(trainingEndpoint, {
             method: 'POST',
             body: formData,
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
         })
-        .then(response => response.json())
+        .then(async response => {
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch (error) {
+                throw new Error(text || `HTTP ${response.status}`);
+            }
+        })
         .then(data => {
             const resultDiv = document.getElementById('trainResult');
             if (data.success) {

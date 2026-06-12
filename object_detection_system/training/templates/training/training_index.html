@@ -585,7 +585,7 @@
         return;
       }
       const yamlPath = yamlSelect.options[yamlSelect.selectedIndex].dataset.fullpath;
-      fetch('', {
+      fetch(window.location.pathname || '/training/', {
         method: 'POST',
         headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded'},
         body: `yaml_edit_path=${encodeURIComponent(yamlPath)}&yaml_content=${encodeURIComponent(yamlContentArea.value)}`

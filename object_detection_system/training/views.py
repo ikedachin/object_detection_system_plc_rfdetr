@@ -86,6 +86,19 @@ def parse_training_augmentation_params(data):
 @csrf_exempt
 def train_view(request):
     if request.method == 'POST':
+        if request.POST.get('yaml_edit_path'):
+            # yamlファイル内容書き換えAPI
+            yaml_path = request.POST.get('yaml_edit_path')
+            yaml_content = request.POST.get('yaml_content')
+            if not yaml_path or not os.path.isfile(yaml_path):
+                return HttpResponseBadRequest('Invalid yaml path')
+            try:
+                with open(yaml_path, 'w', encoding='utf-8') as f:
+                    f.write(yaml_content)
+                return JsonResponse({'success': True})
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': str(e)})
+
         # 通常の学習リクエスト
         data = request.POST
         project_id = data.get('project_id')
@@ -135,8 +148,13 @@ def train_view(request):
         save_dir = save_dir.relative_to(Path(settings.PROJECTS_DIR))
         print(f"Training will be saved to: {save_dir}")
         
-        metrics, best_model_path, config_yaml_path, all_params = run_rfdetr_training(
-            model_name, dataset_yaml, epochs, imgsz, batch, device, save_dir, **other_params)
+        try:
+            metrics, best_model_path, config_yaml_path, all_params = run_rfdetr_training(
+                model_name, dataset_yaml, epochs, imgsz, batch, device, save_dir, **other_params)
+        except ImportError as e:
+            return JsonResponse({'success': False, 'error': f'RF-DETR学習依存関係が不足しています: {e}'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'RF-DETR学習に失敗しました: {e}'})
 
         for key, value in all_params.items():
             print(f"{key}: {value}")
@@ -194,18 +212,6 @@ def train_view(request):
         data_type = request.GET.get('data_type')
         yamls = get_dataset_yamls(project_name, data_type)
         return JsonResponse({'yamls': yamls})
-    elif request.method == 'POST' and request.POST.get('yaml_edit_path'):
-        # yamlファイル内容書き換えAPI
-        yaml_path = request.POST.get('yaml_edit_path')
-        yaml_content = request.POST.get('yaml_content')
-        if not yaml_path or not os.path.isfile(yaml_path):
-            return HttpResponseBadRequest('Invalid yaml path')
-        try:
-            with open(yaml_path, 'w', encoding='utf-8') as f:
-                f.write(yaml_content)
-            return JsonResponse({'success': True})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
     else:
         # デフォルトはdata_collectionでプロジェクトリストを取得
         data_type = request.GET.get('data_type', 'data_collection')

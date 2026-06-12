@@ -1,6 +1,8 @@
 import csv
 import json
+import os
 import platform
+import tempfile
 from argparse import Namespace
 from pathlib import Path
 
@@ -63,6 +65,16 @@ def _read_metrics(output_dir):
 def _default_accelerator():
     # RF-DETR can hit unsupported MPS ops on macOS; prefer CPU unless explicitly overridden.
     return "auto" if platform.system() != "Darwin" else "cpu"
+
+
+def _configure_training_cache_dirs():
+    cache_root = Path(tempfile.gettempdir()) / "object_detection_system_rfdetr_cache"
+    matplotlib_cache = cache_root / "matplotlib"
+    xdg_cache = cache_root / "xdg"
+    matplotlib_cache.mkdir(parents=True, exist_ok=True)
+    xdg_cache.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
+    os.environ.setdefault("XDG_CACHE_HOME", str(xdg_cache))
 
 
 def _build_args(model_name, dataset_root, class_names, epochs, imgsz, batch, output_dir, other_params):
@@ -144,6 +156,7 @@ def _write_detect_yaml(output_dir, best_model_path, model_name, class_names, num
 
 def run_rfdetr_training(model_name, data_yaml, epochs, imgsz, batch, device, save_dir=None, **other_params):
     """Compatibility entry point: trains RF-DETR using the old view contract."""
+    _configure_training_cache_dirs()
     dataset_root, class_names = _read_dataset_yaml(data_yaml)
     if not class_names:
         raise ValueError("データセットYAMLにクラス名がありません")
@@ -191,4 +204,3 @@ def run_rfdetr_training(model_name, data_yaml, epochs, imgsz, batch, device, sav
         "output_dir": str(output_dir),
     })
     return _read_metrics(output_dir), str(best_model_path), str(config_yaml_path), all_params
-

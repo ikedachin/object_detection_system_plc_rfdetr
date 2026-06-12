@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('training_id', currentTrainingId);
             formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
-            fetch('', {
+            fetch(window.location.pathname || '/training/management/', {
                 method: 'POST',
                 body: formData
             })

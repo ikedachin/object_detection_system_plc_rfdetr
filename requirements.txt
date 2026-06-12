@@ -6,7 +6,7 @@ ipykernel==6.30.0
 opencv-python==4.12.0.88
 pycocotools>=2.0.8
 PyYAML==6.0.2
-rfdetr
+rfdetr[train,loggers]
 supervision>=0.25.0
 pip >= 25.1.1
 uvicorn>=0.30.0
