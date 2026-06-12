@@ -11,13 +11,57 @@ import torch
 from datetime import datetime
 
 
-TRAINING_AUGMENTATION_PARAMS = {
-    'flipud': 0.0,
-    'fliplr': 0.5,
-    'mixup': 0.0,
-    'perspective': 0.0,
-    'shear': 0.0,
-    'scale': 0.5,
+RFDETR_DETAIL_PARAM_TYPES = {
+    'epochs': int,
+    'resolution': int,
+    'batch_size': int,
+    'grad_accum_steps': int,
+    'lr': float,
+    'lr_encoder': float,
+    'weight_decay': float,
+    'accelerator': str,
+    'num_workers': int,
+    'use_ema': bool,
+    'gradient_checkpointing': bool,
+    'checkpoint_interval': int,
+    'resume': str,
+    'pretrain_weights': str,
+    'tensorboard': bool,
+    'wandb': bool,
+    'project': str,
+    'run': str,
+    'eval_max_dets': int,
+    'eval_interval': int,
+    'log_per_class_metrics': bool,
+    'progress_bar': str,
+    'seed': int,
+    'lr_scheduler': str,
+    'lr_min_factor': float,
+    'warmup_epochs': float,
+    'drop_path': float,
+    'compute_val_loss': bool,
+    'compute_test_loss': bool,
+    'fp16_eval': bool,
+    'pin_memory': bool,
+    'persistent_workers': bool,
+    'prefetch_factor': int,
+    'early_stopping': bool,
+    'early_stopping_patience': int,
+    'early_stopping_min_delta': float,
+    'early_stopping_use_ema': bool,
+    'aug_config': object,
+    'num_queries': int,
+    'num_select': int,
+}
+
+RFDETR_DETAIL_PARAM_ALIASES = {
+    'workers': 'num_workers',
+    'grad_accumulation_steps': 'grad_accum_steps',
+    'augmentation': 'aug_config',
+    'device': 'accelerator',
+    'wandb_project': 'project',
+    'run_name': 'run',
+    'max_detections': 'eval_max_dets',
 }
 
 
@@ -69,18 +113,73 @@ def get_dataset_yamls(project_name, data_type):
     return [{'name': y.name, 'fullpath': str(y)} for y in sorted(yamls)]
 
 
-def parse_training_augmentation_params(data):
-    params = {}
-    for name, default in TRAINING_AUGMENTATION_PARAMS.items():
-        raw_value = data.get(name, default)
-        try:
-            value = float(raw_value)
-        except (TypeError, ValueError):
-            raise ValueError(f'{name}には0から1までの数値を入力してください')
-        if not 0.0 <= value <= 1.0:
-            raise ValueError(f'{name}には0から1までの数値を入力してください')
-        params[name] = value
-    return params
+def parse_bool(value, name):
+    if isinstance(value, bool):
+        return value
+    if value in (None, ''):
+        raise ValueError(f'{name}にはtrueまたはfalseを入力してください')
+    normalized = str(value).strip().lower()
+    if normalized in {'true', '1', 'yes', 'on'}:
+        return True
+    if normalized in {'false', '0', 'no', 'off'}:
+        return False
+    raise ValueError(f'{name}にはtrueまたはfalseを入力してください')
+
+
+def coerce_detail_param(name, value):
+    target_type = RFDETR_DETAIL_PARAM_TYPES[name]
+    if value in (None, ''):
+        return None
+    if target_type is bool:
+        return parse_bool(value, name)
+    if target_type is object:
+        return value
+    try:
+        return target_type(value)
+    except (TypeError, ValueError):
+        raise ValueError(f'{name}の値が不正です')
+
+
+def normalize_rfdetr_detail_params(params):
+    normalized = {}
+    unsupported = []
+    for raw_name, value in params.items():
+        name = RFDETR_DETAIL_PARAM_ALIASES.get(raw_name, raw_name)
+        if name not in RFDETR_DETAIL_PARAM_TYPES:
+            unsupported.append(raw_name)
+            continue
+        normalized_value = coerce_detail_param(name, value)
+        if normalized_value is not None:
+            normalized[name] = normalized_value
+    if unsupported:
+        raise ValueError(f'RF-DETRで未対応の詳細パラメータです: {", ".join(sorted(unsupported))}')
+    return normalized
+
+
+def parse_aug_config(value):
+    if value in (None, ''):
+        return None
+    if isinstance(value, (dict, list)):
+        return value
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        raise ValueError('aug_configはJSONオブジェクト、JSON配列、または空欄で入力してください')
+    if not isinstance(parsed, (dict, list)):
+        raise ValueError('aug_configはJSONオブジェクト、JSON配列、または空欄で入力してください')
+    return parsed
+
+
+def get_int_param(data, primary, legacy, default):
+    raw_value = data.get(primary)
+    if raw_value in (None, '') and legacy:
+        raw_value = data.get(legacy)
+    if raw_value in (None, ''):
+        raw_value = default
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        raise ValueError(f'{primary}には整数を入力してください')
 
 
 @csrf_exempt
@@ -106,9 +205,12 @@ def train_view(request):
         data_type = data.get('data_type')
         dataset_yaml = data.get('dataset_yaml_fullpath') or data.get('dataset_yaml')
         model_name = data.get('model_name') or 'Roboflow/rf-detr-large'
-        epochs = int(data.get('epochs', 100))
-        imgsz = data.get('imgsz', '640')
-        batch = int(data.get('batch', 16))
+        try:
+            epochs = get_int_param(data, 'epochs', None, 100)
+            resolution = get_int_param(data, 'resolution', 'imgsz', 640)
+            batch_size = get_int_param(data, 'batch_size', 'batch', 16)
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': str(e)})
         other_params = data.get('other_params', '{}')
         
         try:
@@ -136,11 +238,21 @@ def train_view(request):
             return JsonResponse({'success': False, 'error': '詳細パラメータはJSONオブジェクト形式で入力してください'})
 
         try:
-            augmentation_params = parse_training_augmentation_params(data)
+            detail_params = normalize_rfdetr_detail_params(other_params)
+            aug_config = parse_aug_config(data.get('aug_config'))
+            detail_params.pop('epochs', None)
+            detail_params.pop('resolution', None)
+            detail_params.pop('batch_size', None)
+            detail_params['grad_accum_steps'] = get_int_param(data, 'grad_accum_steps', 'grad_accumulation_steps', 4)
+            detail_params['num_workers'] = get_int_param(data, 'num_workers', 'workers', 0)
+            accelerator = data.get('accelerator')
+            if accelerator:
+                detail_params['accelerator'] = str(accelerator)
         except ValueError as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
-        other_params.update(augmentation_params)
+        if aug_config is not None:
+            detail_params['aug_config'] = aug_config
         
         # save_dirを学習名ベースに変更
         save_dir = Path(settings.PROJECTS_DIR) / project.folder_name / 'models' / training_name
@@ -150,7 +262,15 @@ def train_view(request):
         
         try:
             metrics, best_model_path, config_yaml_path, all_params = run_rfdetr_training(
-                model_name, dataset_yaml, epochs, imgsz, batch, device, save_dir, **other_params)
+                model_name,
+                dataset_yaml,
+                epochs=epochs,
+                resolution=resolution,
+                batch_size=batch_size,
+                device=device,
+                save_dir=save_dir,
+                **detail_params,
+            )
         except ImportError as e:
             return JsonResponse({'success': False, 'error': f'RF-DETR学習依存関係が不足しています: {e}'})
         except Exception as e:
@@ -171,15 +291,9 @@ def train_view(request):
             dataset_yaml=dataset_yaml_relative,
             model_name=model_name,
             epochs=epochs,
-            imgsz=imgsz,
-            batch=batch,
-            flipud=augmentation_params['flipud'],
-            fliplr=augmentation_params['fliplr'],
-            mixup=augmentation_params['mixup'],
-            perspective=augmentation_params['perspective'],
-            shear=augmentation_params['shear'],
-            scale=augmentation_params['scale'],
-            other_params=other_params,
+            imgsz=str(resolution),
+            batch=batch_size,
+            other_params=detail_params,
             saved_model_path=saved_model_path,
             config_yaml_path=config_yaml_path_relative,
             metrics=metrics or {},

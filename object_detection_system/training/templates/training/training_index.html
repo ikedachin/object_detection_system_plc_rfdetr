@@ -210,6 +210,81 @@
         #trainForm .btn-primary.mt-3:active {
             color: #222;
         }
+        .training-progress-panel {
+            display: none;
+            border: 1.5px solid #a5d6a7;
+            border-radius: 0.5rem;
+            background: rgba(255,255,255,0.88);
+            padding: 1rem;
+        }
+        .training-progress-panel.active {
+            display: block;
+        }
+        .training-progress-bar {
+            height: 1.35rem;
+            font-weight: 700;
+            color: #111;
+            background-color: #d7f0d9;
+        }
+        .training-progress-bar .progress-bar {
+            background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
+            color: #111;
+        }
+        .training-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.75rem;
+        }
+        .training-metric-card {
+            border: 1px solid #d7ead8;
+            border-radius: 0.5rem;
+            background: #fff;
+            padding: 0.75rem;
+        }
+        .training-metric-name {
+            color: #388e3c;
+            font-size: 0.85rem;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+        .training-metric-value {
+            color: #111;
+            font-size: 1.25rem;
+            font-weight: 800;
+        }
+        .training-chart-wrap {
+            position: relative;
+            width: 100%;
+            min-height: 280px;
+            margin-bottom: 1rem;
+        }
+        .training-chart-title {
+            color: #2e7d32;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+        .training-chart {
+            width: 100%;
+            height: 280px;
+            display: block;
+        }
+        .training-chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+        .training-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .training-legend-color {
+            width: 0.8rem;
+            height: 0.8rem;
+            border-radius: 999px;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -307,52 +382,44 @@
         <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetEpochs">リセット</button>
       </div>
       <div class="param-grid">
-        <label for="batch" class="form-label">バッチサイズ</label>
-        <input type="number" class="form-control" id="batch" name="batch" value="16">
+        <label for="batch_size" class="form-label">バッチサイズ (batch_size)</label>
+        <input type="number" class="form-control" id="batch_size" name="batch_size" value="4" min="1">
         <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#batchInfoModal">説明</button>
-        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetBatch">リセット</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetBatchSize">リセット</button>
       </div>
       <div class="param-grid">
-        <label for="imgsz" class="form-label">画像サイズ</label>
-        <input type="text" class="form-control" id="imgsz" name="imgsz" value="640">
-        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#imgszInfoModal">説明</button>
-        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetImgsz">リセット</button>
+        <label for="grad_accum_steps" class="form-label">勾配累積 (grad_accum_steps)</label>
+        <input type="number" class="form-control" id="grad_accum_steps" name="grad_accum_steps" value="4" min="1">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#gradAccumInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetGradAccumSteps">リセット</button>
       </div>
       <div class="param-grid">
-        <label for="flipud" class="form-label">上下反転確率 (flipud)</label>
-        <input type="number" step="0.01" min="0" max="1" class="form-control" id="flipud" name="flipud" value="0.0">
-        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#flipudInfoModal">説明</button>
-        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetFlipud">リセット</button>
+        <label for="resolution" class="form-label">入力解像度 (resolution)</label>
+        <input type="number" class="form-control" id="resolution" name="resolution" value="640" min="1">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#resolutionInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetResolution">リセット</button>
       </div>
       <div class="param-grid">
-        <label for="fliplr" class="form-label">左右反転確率 (fliplr)</label>
-        <input type="number" step="0.01" min="0" max="1" class="form-control" id="fliplr" name="fliplr" value="0.5">
-        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#fliplrInfoModal">説明</button>
-        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetFliplr">リセット</button>
+        <label for="num_workers" class="form-label">DataLoader workers (num_workers)</label>
+        <input type="number" class="form-control" id="num_workers" name="num_workers" value="1" min="0">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#numWorkersInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetNumWorkers">リセット</button>
       </div>
       <div class="param-grid">
-        <label for="mixup" class="form-label">MixUp合成率 (mixup)</label>
-        <input type="number" step="0.01" min="0" max="0.1" class="form-control" id="mixup" name="mixup" value="0.0">
-        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#mixupInfoModal">説明</button>
-        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetMixup">リセット</button>
+        <label for="accelerator" class="form-label">アクセラレータ (accelerator)</label>
+        <select class="form-select" id="accelerator" name="accelerator">
+          <option value="auto">auto</option>
+          <option value="cpu" selected>cpu</option>
+          <option value="cuda">cuda</option>
+          <option value="mps">mps</option>
+        </select>
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#acceleratorInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetAccelerator">リセット</button>
       </div>
-      <div class="param-grid">
-        <label for="perspective" class="form-label">遠近変換強度 (perspective)</label>
-        <input type="number" step="0.0001" min="0" max="0.001" class="form-control" id="perspective" name="perspective" value="0.0000">
-        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#perspectiveInfoModal">説明</button>
-        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetPerspective">リセット</button>
-      </div>
-      <div class="param-grid">
-        <label for="shear" class="form-label">シアー強度 (shear)</label>
-        <input type="number" step="0.01" min="0" max="1" class="form-control" id="shear" name="shear" value="0.0">
-        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#shearInfoModal">説明</button>
-        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetShear">リセット</button>
-      </div>
-      <div class="param-grid">
-        <label for="scale" class="form-label">スケール変換範囲 (scale)</label>
-        <input type="number" step="0.01" min="0" max="1" class="form-control" id="scale" name="scale" value="0.5">
-        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#scaleInfoModal">説明</button>
-        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetScale">リセット</button>
+      <div class="mb-3">
+        <label for="aug_config" class="form-label">拡張設定 (aug_config JSON)</label>
+        <textarea class="form-control" id="aug_config" name="aug_config" rows="4">{"HorizontalFlip": {"p": 0.5}}</textarea>
+        <div class="form-text">空欄はRF-DETR標準、{}は拡張なしです。</div>
       </div>
       <!-- エポック数説明モーダル -->
       <div class="modal fade" id="epochsInfoModal" tabindex="-1" aria-labelledby="epochsInfoModalLabel" aria-hidden="true">
@@ -371,16 +438,16 @@
           </div>
         </div>
       </div>
-      <!-- 画像サイズ説明モーダル -->
-      <div class="modal fade" id="imgszInfoModal" tabindex="-1" aria-labelledby="imgszInfoModalLabel" aria-hidden="true">
+      <!-- 解像度説明モーダル -->
+      <div class="modal fade" id="resolutionInfoModal" tabindex="-1" aria-labelledby="resolutionInfoModalLabel" aria-hidden="true">
         <div class="modal-dialog">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="imgszInfoModalLabel">画像サイズの説明</h5>
+              <h5 class="modal-title" id="resolutionInfoModalLabel">入力解像度 (resolution) の説明</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              入力画像をリサイズする際の一辺の長さを指定します。大きいほど精度が上がる場合がありますが、メモリ消費も増えます。
+              RF-DETRへ渡す入力画像の一辺の長さです。大きいほど精度が上がる場合がありますが、メモリ消費と学習時間も増えます。
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
@@ -397,7 +464,7 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              1回の学習で同時に処理するデータ数を指定します。大きいほど学習が速くなりますが、メモリ消費も増えます。
+              RF-DETRのbatch_sizeです。実効バッチサイズは batch_size x grad_accum_steps x GPU数 で決まります。
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
@@ -405,16 +472,16 @@
           </div>
         </div>
       </div>
-      <!-- flipud説明モーダル -->
-      <div class="modal fade" id="flipudInfoModal" tabindex="-1" aria-labelledby="flipudInfoModalLabel" aria-hidden="true">
+      <!-- 勾配累積説明モーダル -->
+      <div class="modal fade" id="gradAccumInfoModal" tabindex="-1" aria-labelledby="gradAccumInfoModalLabel" aria-hidden="true">
         <div class="modal-dialog">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="flipudInfoModalLabel">上下反転確率 (flipud) の説明</h5>
+              <h5 class="modal-title" id="gradAccumInfoModalLabel">勾配累積 (grad_accum_steps) の説明</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              画像を上下反転する確率を指定します。0.0で反転なし、1.0で常に反転。
+              複数ミニバッチ分の勾配をためてから重みを更新します。メモリが少ない環境でも実効バッチサイズを大きくできます。
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
@@ -422,16 +489,16 @@
           </div>
         </div>
       </div>
-      <!-- fliplr説明モーダル -->
-      <div class="modal fade" id="fliplrInfoModal" tabindex="-1" aria-labelledby="fliplrInfoModalLabel" aria-hidden="true">
+      <!-- num_workers説明モーダル -->
+      <div class="modal fade" id="numWorkersInfoModal" tabindex="-1" aria-labelledby="numWorkersInfoModalLabel" aria-hidden="true">
         <div class="modal-dialog">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="fliplrInfoModalLabel">左右反転確率 (fliplr) の説明</h5>
+              <h5 class="modal-title" id="numWorkersInfoModalLabel">DataLoader workers (num_workers) の説明</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              画像を左右反転する確率を指定します。0.0で反転なし、1.0で常に反転。
+              データ読み込みと拡張処理に使うワーカー数です。値を増やすと速くなる場合がありますが、環境によっては不安定になることがあります。
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
@@ -439,67 +506,16 @@
           </div>
         </div>
       </div>
-      <!-- mixup説明モーダル -->
-      <div class="modal fade" id="mixupInfoModal" tabindex="-1" aria-labelledby="mixupInfoModalLabel" aria-hidden="true">
+      <!-- accelerator説明モーダル -->
+      <div class="modal fade" id="acceleratorInfoModal" tabindex="-1" aria-labelledby="acceleratorInfoModalLabel" aria-hidden="true">
         <div class="modal-dialog">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title" id="mixupInfoModalLabel">MixUp合成率 (mixup) の説明</h5>
+              <h5 class="modal-title" id="acceleratorInfoModalLabel">アクセラレータ (accelerator) の説明</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              画像同士を合成するMixUpの割合を指定します。0.0でMixUpなし、0.1で最大MixUp（通常は小さな値を推奨）。
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- perspective説明モーダル -->
-      <div class="modal fade" id="perspectiveInfoModal" tabindex="-1" aria-labelledby="perspectiveInfoModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="perspectiveInfoModalLabel">遠近変換強度 (perspective) の説明</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              画像に遠近変換を加える強度を指定します。0.0で変換なし、0.001で最大変換（通常は非常に小さな値を推奨）。
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- shear説明モーダル -->
-      <div class="modal fade" id="shearInfoModal" tabindex="-1" aria-labelledby="shearInfoModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="shearInfoModalLabel">シアー強度 (shear) の説明</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              画像にシアー（斜め変形）を加える強度を指定します。0.0で変形なし、1.0で最大変形。
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- scale説明モーダル -->
-      <div class="modal fade" id="scaleInfoModal" tabindex="-1" aria-labelledby="scaleInfoModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="scaleInfoModalLabel">スケール変換範囲 (scale) の説明</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              画像の拡大・縮小の範囲を指定します。0.0で変化なし、1.0で最大範囲。
+              RF-DETRのPyTorch Lightning acceleratorです。Macではmpsで未対応演算に当たる場合があるため、既定はcpuにしています。
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
@@ -511,10 +527,42 @@
       <div class="collapse" id="detailParams">
         <div class="card card-body">
           <label for="other_params" class="form-label">詳細パラメータ(JSON形式)</label>
-          <textarea class="form-control" id="other_params" name="other_params" rows="4">{"workers": 1}</textarea>
+          <textarea class="form-control" id="other_params" name="other_params" rows="4">{"lr": 0.0001, "lr_encoder": 0.00015, "eval_interval": 1}</textarea>
         </div>
       </div>
-      <div id="metricsArea" class="mt-4"></div>
+      <div id="metricsArea" class="training-progress-panel mt-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <div>
+            <strong>学習進捗</strong>
+            <div class="text-muted small">学習が終わるまでストップすることはできません。</div>
+          </div>
+          <div id="epochLabel" class="fw-bold">Epoch: 0 / 0</div>
+        </div>
+        <div class="progress training-progress-bar mb-3" role="progressbar" aria-label="学習進捗" aria-valuemin="0" aria-valuemax="100">
+          <div id="epochProgressBar" class="progress-bar" style="width: 0%;">0%</div>
+        </div>
+        <div id="metricsCards" class="training-metrics-grid mb-3"></div>
+        <div class="training-chart-wrap">
+          <div class="training-chart-title">box loss</div>
+          <canvas id="boxLossChart" class="training-chart" width="900" height="280"></canvas>
+          <div id="boxLossLegend" class="training-chart-legend mt-2"></div>
+        </div>
+        <div class="training-chart-wrap">
+          <div class="training-chart-title">cls loss</div>
+          <canvas id="clsLossChart" class="training-chart" width="900" height="280"></canvas>
+          <div id="clsLossLegend" class="training-chart-legend mt-2"></div>
+        </div>
+        <div class="training-chart-wrap">
+          <div class="training-chart-title">dfl loss</div>
+          <canvas id="dflLossChart" class="training-chart" width="900" height="280"></canvas>
+          <div id="dflLossLegend" class="training-chart-legend mt-2"></div>
+        </div>
+        <div class="training-chart-wrap">
+          <div class="training-chart-title">metrics / precision recall mAP</div>
+          <canvas id="metricsChart" class="training-chart" width="900" height="280"></canvas>
+          <div id="metricsLegend" class="training-chart-legend mt-2"></div>
+        </div>
+      </div>
       <div class="center-btn mt-4">
           <button type="submit" class="btn btn-primary mt-3" id="trainSubmitBtn">
             <span class="btn-text"><i class="bi bi-rocket-takeoff"></i> 学習スタート</span>
@@ -535,29 +583,20 @@
     document.getElementById('resetEpochs').addEventListener('click', function() {
       document.getElementById('epochs').value = 100;
     });
-    document.getElementById('resetBatch').addEventListener('click', function() {
-      document.getElementById('batch').value = 16;
+    document.getElementById('resetBatchSize').addEventListener('click', function() {
+      document.getElementById('batch_size').value = 4;
     });
-    document.getElementById('resetImgsz').addEventListener('click', function() {
-      document.getElementById('imgsz').value = 640;
+    document.getElementById('resetGradAccumSteps').addEventListener('click', function() {
+      document.getElementById('grad_accum_steps').value = 4;
     });
-    document.getElementById('resetFlipud').addEventListener('click', function() {
-      document.getElementById('flipud').value = 0.0;
+    document.getElementById('resetResolution').addEventListener('click', function() {
+      document.getElementById('resolution').value = 640;
     });
-    document.getElementById('resetFliplr').addEventListener('click', function() {
-      document.getElementById('fliplr').value = 0.5;
+    document.getElementById('resetNumWorkers').addEventListener('click', function() {
+      document.getElementById('num_workers').value = 1;
     });
-    document.getElementById('resetMixup').addEventListener('click', function() {
-      document.getElementById('mixup').value = 0.0;
-    });
-    document.getElementById('resetPerspective').addEventListener('click', function() {
-      document.getElementById('perspective').value = 0.0;
-    });
-    document.getElementById('resetShear').addEventListener('click', function() {
-      document.getElementById('shear').value = 0.0;
-    });
-    document.getElementById('resetScale').addEventListener('click', function() {
-      document.getElementById('scale').value = 0.5;
+    document.getElementById('resetAccelerator').addEventListener('click', function() {
+      document.getElementById('accelerator').value = 'cpu';
     });
     const yamlSelect = document.getElementById('dataset_yaml');
 
@@ -601,6 +640,332 @@
       });
     });
 
+    const metricsArea = document.getElementById('metricsArea');
+    const epochLabel = document.getElementById('epochLabel');
+    const epochProgressBar = document.getElementById('epochProgressBar');
+    const metricsCards = document.getElementById('metricsCards');
+    const metricsHistory = [];
+    const chartColors = ['#2e7d32', '#1565c0', '#c62828', '#ef6c00', '#6a1b9a', '#00838f'];
+    const preferredMetricWords = ['box_loss', 'loss_bbox', 'cls_loss', 'class_loss', 'loss_ce', 'dfl_loss', 'loss_giou', 'precision', 'recall', 'map'];
+    const chartConfigs = [
+      {
+        canvas: document.getElementById('boxLossChart'),
+        legend: document.getElementById('boxLossLegend'),
+        axisLabel: 'box loss',
+        emptyText: 'box lossを受信するとグラフを表示します。',
+        axisSide: 'left',
+        matches: key => {
+          const normalized = normalizeMetricKey(key);
+          return normalized.includes('box_loss') || normalized.includes('loss_bbox') || normalized.endsWith('bbox');
+        },
+        rank: key => normalizeMetricKey(key).startsWith('train/') ? 0 : 1,
+      },
+      {
+        canvas: document.getElementById('clsLossChart'),
+        legend: document.getElementById('clsLossLegend'),
+        axisLabel: 'cls loss',
+        emptyText: 'cls lossを受信するとグラフを表示します。',
+        axisSide: 'left',
+        matches: key => {
+          const normalized = normalizeMetricKey(key);
+          return normalized.includes('cls_loss') || normalized.includes('class_loss') || normalized.includes('loss_ce');
+        },
+        rank: key => normalizeMetricKey(key).startsWith('train/') ? 0 : 1,
+      },
+      {
+        canvas: document.getElementById('dflLossChart'),
+        legend: document.getElementById('dflLossLegend'),
+        axisLabel: 'dfl loss',
+        emptyText: 'dfl lossを受信するとグラフを表示します。',
+        axisSide: 'left',
+        matches: key => {
+          const normalized = normalizeMetricKey(key);
+          return normalized.includes('dfl_loss') || normalized.includes('loss_giou') || normalized.endsWith('giou');
+        },
+        rank: key => normalizeMetricKey(key).startsWith('train/') ? 0 : 1,
+      },
+      {
+        canvas: document.getElementById('metricsChart'),
+        legend: document.getElementById('metricsLegend'),
+        axisLabel: 'metrics',
+        emptyText: 'precision / recall / mAPを受信するとグラフを表示します。',
+        axisSide: 'right',
+        matches: key => {
+          const normalized = normalizeMetricKey(key);
+          return normalized.includes('precision') || normalized.includes('recall') || normalized.includes('map');
+        },
+        rank: key => {
+          const normalized = normalizeMetricKey(key);
+          if (normalized.includes('precision')) return 0;
+          if (normalized.includes('recall')) return 1;
+          if (normalized.includes('map50') && !normalized.includes('map50_95')) return 2;
+          if (normalized.includes('map')) return 3;
+          return 4;
+        },
+      },
+    ];
+
+    function resetTrainingProgress() {
+      metricsHistory.length = 0;
+      if (metricsArea) {
+        metricsArea.classList.add('active');
+      }
+      if (epochLabel) {
+        epochLabel.textContent = 'Epoch: 0 / 0';
+      }
+      if (epochProgressBar) {
+        epochProgressBar.style.width = '0%';
+        epochProgressBar.textContent = '0%';
+        epochProgressBar.setAttribute('aria-valuenow', '0');
+      }
+      if (metricsCards) {
+        metricsCards.innerHTML = '';
+      }
+      chartConfigs.forEach(config => {
+        if (config.legend) {
+          config.legend.innerHTML = '';
+        }
+      });
+      drawTrainingCharts();
+    }
+
+    function normalizeMetricKey(key) {
+      return String(key).toLowerCase().replace(/[\s-]+/g, '_');
+    }
+
+    function toFiniteNumber(value) {
+      const numberValue = Number(value);
+      return Number.isFinite(numberValue) ? numberValue : null;
+    }
+
+    function formatMetricValue(value) {
+      const numberValue = toFiniteNumber(value);
+      if (numberValue === null) {
+        return String(value);
+      }
+      return Math.abs(numberValue) >= 100 ? numberValue.toFixed(2) : numberValue.toFixed(4);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function metricRank(key) {
+      const normalized = normalizeMetricKey(key);
+      const index = preferredMetricWords.findIndex(word => normalized.includes(word));
+      return index === -1 ? preferredMetricWords.length : index;
+    }
+
+    function getChartScale(metricKeys) {
+      const values = [];
+      metricKeys.forEach(key => {
+        metricsHistory.forEach(point => {
+          const value = toFiniteNumber(point.metrics[key]);
+          if (value !== null) {
+            values.push(value);
+          }
+        });
+      });
+      if (values.length === 0) {
+        return null;
+      }
+      let min = Math.min(...values);
+      let max = Math.max(...values);
+      if (min === max) {
+        min -= 1;
+        max += 1;
+      }
+      return { min, max, range: max - min };
+    }
+
+    function getChartMetricKeys(config) {
+      const keySet = new Set();
+      metricsHistory.forEach(point => {
+        Object.entries(point.metrics).forEach(([key, value]) => {
+          if (config.matches(key) && toFiniteNumber(value) !== null) {
+            keySet.add(key);
+          }
+        });
+      });
+      return Array.from(keySet)
+        .sort((a, b) => config.rank(a) - config.rank(b) || a.localeCompare(b))
+        .slice(0, 6);
+    }
+
+    function updateProgressDisplay(epoch, totalEpochs) {
+      const safeEpoch = Math.max(0, Number(epoch) || 0);
+      const safeTotal = Math.max(0, Number(totalEpochs) || 0);
+      const percent = safeTotal > 0 ? Math.min(100, Math.round((safeEpoch / safeTotal) * 100)) : 0;
+      if (epochLabel) {
+        epochLabel.textContent = `Epoch: ${safeEpoch} / ${safeTotal}`;
+      }
+      if (epochProgressBar) {
+        epochProgressBar.style.width = `${percent}%`;
+        epochProgressBar.textContent = `${percent}%`;
+        epochProgressBar.setAttribute('aria-valuenow', String(percent));
+      }
+    }
+
+    function updateMetricCards(metrics) {
+      if (!metricsCards) {
+        return;
+      }
+      const entries = Object.entries(metrics || {}).sort((a, b) => metricRank(a[0]) - metricRank(b[0]) || a[0].localeCompare(b[0]));
+      if (entries.length === 0) {
+        metricsCards.innerHTML = '<div class="text-muted">メトリクスを待機中です。</div>';
+        return;
+      }
+      metricsCards.innerHTML = entries.map(([key, value]) => `
+        <div class="training-metric-card">
+          <div class="training-metric-name">${escapeHtml(key)}</div>
+          <div class="training-metric-value">${escapeHtml(formatMetricValue(value))}</div>
+        </div>
+      `).join('');
+    }
+
+    function drawTrainingCharts() {
+      chartConfigs.forEach(drawMetricChart);
+    }
+
+    function drawMetricChart(config) {
+      const canvas = config.canvas;
+      if (!canvas) {
+        return;
+      }
+      const ctx = canvas.getContext('2d');
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(320, Math.floor(rect.width || canvas.width));
+      const height = 280;
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+
+      const padding = { top: 18, right: 62, bottom: 36, left: 62 };
+      const plotWidth = width - padding.left - padding.right;
+      const plotHeight = height - padding.top - padding.bottom;
+
+      ctx.strokeStyle = '#d7ead8';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (plotHeight * i / 4);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(width - padding.right, y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = '#8fbf91';
+      ctx.beginPath();
+      ctx.moveTo(padding.left, padding.top);
+      ctx.lineTo(padding.left, height - padding.bottom);
+      ctx.moveTo(width - padding.right, padding.top);
+      ctx.lineTo(width - padding.right, height - padding.bottom);
+      ctx.moveTo(padding.left, height - padding.bottom);
+      ctx.lineTo(width - padding.right, height - padding.bottom);
+      ctx.stroke();
+
+      const metricKeys = getChartMetricKeys(config);
+      if (metricsHistory.length === 0 || metricKeys.length === 0) {
+        ctx.fillStyle = '#6c757d';
+        ctx.font = '14px sans-serif';
+        ctx.fillText(config.emptyText, padding.left, padding.top + 28);
+        if (config.legend) {
+          config.legend.innerHTML = '';
+        }
+        return;
+      }
+
+      const scale = getChartScale(metricKeys);
+      const firstEpoch = metricsHistory[0].epoch;
+      const lastEpoch = metricsHistory[metricsHistory.length - 1].epoch;
+      const epochRange = Math.max(1, lastEpoch - firstEpoch);
+
+      ctx.fillStyle = '#6c757d';
+      ctx.font = '12px sans-serif';
+      if (scale && config.axisSide === 'left') {
+        ctx.textAlign = 'right';
+        ctx.fillText(scale.max.toFixed(3), padding.left - 8, padding.top + 4);
+        ctx.fillText(scale.min.toFixed(3), padding.left - 8, height - padding.bottom);
+        ctx.fillText(config.axisLabel, padding.left - 8, padding.top + 20);
+      }
+      if (scale && config.axisSide === 'right') {
+        ctx.textAlign = 'left';
+        ctx.fillText(scale.max.toFixed(3), width - padding.right + 8, padding.top + 4);
+        ctx.fillText(scale.min.toFixed(3), width - padding.right + 8, height - padding.bottom);
+        ctx.fillText(config.axisLabel, width - padding.right + 8, padding.top + 20);
+      }
+      ctx.textAlign = 'left';
+      ctx.fillText(`Epoch ${firstEpoch}`, padding.left, height - 10);
+      ctx.textAlign = 'right';
+      ctx.fillText(`Epoch ${lastEpoch}`, width - padding.right, height - 10);
+      ctx.textAlign = 'left';
+
+      metricKeys.forEach((key, index) => {
+        const color = chartColors[index % chartColors.length];
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let hasPoint = false;
+        metricsHistory.forEach(point => {
+          const value = toFiniteNumber(point.metrics[key]);
+          if (value === null || !scale) {
+            return;
+          }
+          const x = padding.left + ((point.epoch - firstEpoch) / epochRange) * plotWidth;
+          const y = padding.top + ((scale.max - value) / scale.range) * plotHeight;
+          if (hasPoint) {
+            ctx.lineTo(x, y);
+          } else {
+            ctx.moveTo(x, y);
+            hasPoint = true;
+          }
+        });
+        ctx.stroke();
+        metricsHistory.forEach(point => {
+          const value = toFiniteNumber(point.metrics[key]);
+          if (value === null || !scale) {
+            return;
+          }
+          const x = padding.left + ((point.epoch - firstEpoch) / epochRange) * plotWidth;
+          const y = padding.top + ((scale.max - value) / scale.range) * plotHeight;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      });
+
+      if (config.legend) {
+        config.legend.innerHTML = metricKeys.map((key, index) => `
+          <span class="training-legend-item">
+            <span class="training-legend-color" style="background:${chartColors[index % chartColors.length]}"></span>
+            ${escapeHtml(key)}
+          </span>
+        `).join('');
+      }
+    }
+
+    function updateTrainingProgress(data) {
+      const epoch = Number(data.epoch) || 0;
+      const totalEpochs = Number(data.total_epochs) || 0;
+      const metrics = data.metrics || {};
+      if (metricsArea) {
+        metricsArea.classList.add('active');
+      }
+      updateProgressDisplay(epoch, totalEpochs);
+      updateMetricCards(metrics);
+      metricsHistory.push({ epoch, metrics });
+      drawTrainingCharts();
+    }
+
     // 学習ボタンのアニメーション
     const trainForm = document.getElementById('trainForm');
     const trainBtn = document.getElementById('trainSubmitBtn');
@@ -618,6 +983,7 @@
         btnText.textContent = '学習中...';
         trainSpinner.classList.remove('d-none');
         trainBtn.disabled = true;
+        resetTrainingProgress();
         // trainResultを非表示にする
         const trainResult = document.getElementById('trainResult');
         if (trainResult) {
@@ -641,20 +1007,14 @@
       }
     }
 
+    window.addEventListener('resize', drawTrainingCharts);
+
     // RF-DETR学習進捗WebSocket受信
-    const metricsArea = document.getElementById('metricsArea');
     const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${ws_scheme}://${window.location.host}/ws/rfdetr_training/`);
     ws.onmessage = function(event) {
       const data = JSON.parse(event.data);
-      const epoch = data.epoch;
-      const total_epochs = data.total_epochs;
-      const metrics = data.metrics;
-      let html = `学習が終わるまでストップすることはできません。<br><br><b>Epoch: ${epoch} / ${total_epochs}</b><br>`;
-      for (const [k, v] of Object.entries(metrics)) {
-        html += `${k}: ${v}<br>`;
-      }
-      metricsArea.innerHTML = html;
+      updateTrainingProgress(data);
     };
   });
 </script>

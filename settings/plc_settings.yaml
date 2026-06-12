@@ -2,7 +2,7 @@ plc:
   enabled: false
 
 test_server:
-  enabled: true
+  enabled: false
   host: "127.0.0.1"
   port: 8010
   base_url: "http://127.0.0.1:8010"
