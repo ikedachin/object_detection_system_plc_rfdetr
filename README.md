@@ -3,6 +3,7 @@
 rfdetr社のRF-DETRを**誰でも、簡単に**使えることを目的としたwebアプリです
 RF-DETRに関してはrfdetr社のライセンスに準じます。
 
+![RF-DETRシステム画面](./assets/images/image.png)
 
 
 ## 概要
