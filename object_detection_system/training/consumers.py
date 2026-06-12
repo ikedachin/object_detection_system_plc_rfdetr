@@ -14,4 +14,5 @@ class RfdetrTrainingConsumer(AsyncWebsocketConsumer):
             'epoch': event.get('epoch'),
             'total_epochs': event.get('total_epochs'),
             'metrics': event.get('metrics'),
+            'status': event.get('status', 'running'),
         }))

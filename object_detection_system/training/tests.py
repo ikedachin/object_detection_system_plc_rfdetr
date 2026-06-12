@@ -10,7 +10,7 @@ from django.test import TestCase, override_settings
 
 from annotator.models import Project
 from object_detection_system.asgi import application
-from training.applications.rfdetr_train import _build_args, _send_new_metric_rows, run_rfdetr_training
+from training.applications.rfdetr_train import _build_args, _send_final_metric_row, _send_new_metric_rows, run_rfdetr_training
 from training.applications.rfdetr_native import training_kwargs_from_args
 from training.models import TrainingRun
 
@@ -267,6 +267,32 @@ class RfdetrTrainingMetricsTests(TestCase):
         mock_send.assert_called_once()
         self.assertEqual(mock_send.call_args.args[0], 2)
 
+    def test_final_metric_sender_forces_complete_epoch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics_path = Path(tmp) / 'metrics.csv'
+            metrics_path.write_text(
+                'epoch,train/loss_bbox,train/loss_ce,metrics/mAP50(B)\n'
+                '0,0.3,2.0,0.4\n'
+                '4,0.1,1.2,0.8\n',
+                encoding='utf-8',
+            )
+
+            with patch('training.applications.rfdetr_train._send_training_metrics') as mock_send:
+                _send_final_metric_row(tmp, total_epochs=5, wait_attempts=1, wait_seconds=0)
+
+        mock_send.assert_called_once()
+        self.assertEqual(mock_send.call_args.args[0], 5)
+        self.assertEqual(mock_send.call_args.args[1], 5)
+        self.assertEqual(
+            mock_send.call_args.args[2],
+            {
+                'train/loss_bbox': 0.1,
+                'train/loss_ce': 1.2,
+                'metrics/mAP50(B)': 0.8,
+            },
+        )
+        self.assertEqual(mock_send.call_args.kwargs['status'], 'complete')
+
     async def test_training_metrics_are_delivered_to_rfdetr_websocket(self):
         communicator = WebsocketCommunicator(application, '/ws/rfdetr_training/')
         connected, _ = await communicator.connect()
@@ -294,6 +320,7 @@ class RfdetrTrainingMetricsTests(TestCase):
         self.assertEqual(response['metrics']['train/loss_bbox'], 0.12)
         self.assertEqual(response['metrics']['train/loss_ce'], 1.23)
         self.assertEqual(response['metrics']['metrics/mAP50(B)'], 0.66)
+        self.assertEqual(response['status'], 'running')
 
 
 class TrainingProjectYamlSelectionTests(TestCase):
@@ -404,6 +431,7 @@ class RfdetrTrainingArgumentTests(TestCase):
                      patch('training.applications.rfdetr_train.create_model', return_value=FakeModel()), \
                      patch('training.applications.rfdetr_train._find_checkpoint', return_value=checkpoint), \
                      patch('training.applications.rfdetr_train._write_detect_yaml', return_value=detect_yaml), \
+                     patch('training.applications.rfdetr_train._send_final_metric_row'), \
                      patch('training.applications.rfdetr_train._read_metrics', return_value={}):
                     mock_read_dataset_yaml.return_value = (project_root / 'dataset', ['part'])
                     mock_prepare_dataset.return_value = str(project_root / 'adapted')

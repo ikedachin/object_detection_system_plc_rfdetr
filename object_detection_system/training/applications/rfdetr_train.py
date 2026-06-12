@@ -90,7 +90,7 @@ def _row_epoch(row, fallback_epoch):
     return fallback_epoch
 
 
-def _send_training_metrics(epoch, total_epochs, metrics):
+def _send_training_metrics(epoch, total_epochs, metrics, status="running"):
     channel_layer = get_channel_layer()
     if not channel_layer:
         return
@@ -101,6 +101,7 @@ def _send_training_metrics(epoch, total_epochs, metrics):
             "epoch": epoch,
             "total_epochs": total_epochs,
             "metrics": metrics,
+            "status": status,
         },
     )
 
@@ -129,6 +130,27 @@ def _send_new_metric_rows(metrics_path, total_epochs, sent_rows=0):
         epoch = _row_epoch(row, index)
         _send_training_metrics(epoch, total_epochs, metrics)
     return len(rows)
+
+
+def _send_final_metric_row(output_dir, total_epochs, wait_attempts=10, wait_seconds=0.5):
+    metrics_path = Path(output_dir) / "metrics.csv"
+    latest_row = None
+    for _ in range(wait_attempts):
+        if metrics_path.exists():
+            try:
+                with metrics_path.open("r", encoding="utf-8", newline="") as f:
+                    rows = list(csv.DictReader(f))
+            except (OSError, csv.Error):
+                rows = []
+            if rows:
+                latest_row = rows[-1]
+                row_epoch = _row_epoch(latest_row, len(rows))
+                if row_epoch >= total_epochs or len(rows) >= total_epochs:
+                    break
+        threading.Event().wait(wait_seconds)
+
+    metrics = _format_training_metrics(latest_row or {})
+    _send_training_metrics(total_epochs, total_epochs, metrics, status="complete")
 
 
 def _default_accelerator():
@@ -280,6 +302,7 @@ def run_rfdetr_training(model_name, data_yaml, epochs, resolution, batch_size, d
     finally:
         stop_metrics_monitor.set()
         metrics_monitor.join(timeout=5)
+        _send_final_metric_row(output_dir, args.epochs)
 
     best_model_path = _find_checkpoint(output_dir)
     config_yaml_path = _write_detect_yaml(

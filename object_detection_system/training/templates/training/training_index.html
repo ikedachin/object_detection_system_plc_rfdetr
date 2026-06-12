@@ -966,20 +966,36 @@
       drawTrainingCharts();
     }
 
+    function finishTrainingUi() {
+      const trainBtn = document.getElementById('trainSubmitBtn');
+      const trainSpinner = document.getElementById('trainSpinner');
+      const btnText = trainBtn ? trainBtn.querySelector('.btn-text') : null;
+      if (btnText) {
+        btnText.innerHTML = '<i class="bi bi-rocket-takeoff"></i> 学習スタート';
+      }
+      if (trainSpinner) {
+        trainSpinner.classList.add('d-none');
+      }
+      if (trainBtn) {
+        trainBtn.disabled = false;
+      }
+      window.trainingInProgress = false;
+    }
+
     // 学習ボタンのアニメーション
     const trainForm = document.getElementById('trainForm');
     const trainBtn = document.getElementById('trainSubmitBtn');
     const trainSpinner = document.getElementById('trainSpinner');
-    const btnText = trainBtn.querySelector('.btn-text');
+    const btnText = trainBtn ? trainBtn.querySelector('.btn-text') : null;
     if (trainForm && trainBtn && trainSpinner && btnText) {
-      let trainingInProgress = false;
+      window.trainingInProgress = false;
       trainForm.addEventListener('submit', function(e) {
-        if (trainingInProgress) {
+        if (window.trainingInProgress) {
           // 2重送信防止
           e.preventDefault();
           return false;
         }
-        trainingInProgress = true;
+        window.trainingInProgress = true;
         btnText.textContent = '学習中...';
         trainSpinner.classList.remove('d-none');
         trainBtn.disabled = true;
@@ -995,10 +1011,7 @@
       if (trainResult) {
         const observer = new MutationObserver(function(mutationsList, observer) {
           if (trainResult.innerHTML.trim() !== '') {
-            btnText.innerHTML = '<i class="bi bi-rocket-takeoff"></i> 学習スタート';
-            trainSpinner.classList.add('d-none');
-            trainBtn.disabled = false;
-            trainingInProgress = false;
+            finishTrainingUi();
             // trainResultを再表示する
             trainResult.style.display = '';
           }
@@ -1015,6 +1028,9 @@
     ws.onmessage = function(event) {
       const data = JSON.parse(event.data);
       updateTrainingProgress(data);
+      if (data.status === 'complete') {
+        finishTrainingUi();
+      }
     };
   });
 </script>
