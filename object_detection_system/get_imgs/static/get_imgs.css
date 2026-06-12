@@ -1,0 +1,131 @@
+
+body {
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+    color: #ffffff;
+    background-color: #000000;
+    /* min-height: 100vh;
+    min-width: 100vw; */
+}
+
+h3 {
+    color: #ffffff;
+}
+
+/* 撮影ボタン */
+.btn--orange,
+button.btn--orange {
+    color: #fff;
+    font-size: 2.5vw;
+    background-color: #eb6100;
+    padding: 0.5vw 1vw 0.5vw 1vw;
+    border-radius: 0.8vw;
+    height: 5vw;
+    margin: 2vw;
+}
+.btn--orange:hover,
+button.btn--orange:hover {
+    font-size: 2.5vw;
+    color: #fff;
+    background: #f5bc00;
+    padding: 0.2vw 1vw 0.2vw 1vw;
+    border-radius: 0.8vw;
+    height: 5vw;
+}
+
+button.btn--radius {
+    font-size: 2.5vw;
+    border-radius: 0.8vw;
+    padding: 0.2vw 1vw 0.2vw 1vw;
+    height: 5vw;
+}
+
+
+
+
+/* 表示部 */
+div.display-wrapper-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2vw;
+    width: 95vw;
+    height: 60vh;
+    background-color: #3e3e3e;
+    border-radius: 4vw;
+    margin: 0 auto;
+    border: solid 2px #ffffff;
+    font-size: 4.5vw;
+    color: #ffffff;
+    /* text-align: center; */
+}
+
+div.display-wrapper-center div {
+    align-items: center;
+}
+
+div.display-wrapper-center canvas {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    padding-top: 1.8vw;
+    padding-bottom: 1.8vw;
+    max-width: 40vw;
+    /* max-height: 25vh; */
+}
+
+div.display-wrapper-center video {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    padding-top: 1.8vw;
+    padding-bottom: 1.8vw;
+    max-width: 40vw;
+    /* max-height: 25vh; */
+}
+
+/* video, canvas {
+    max-width: 40vw;
+    max-width: 25wh;
+    border:  1px solid #777; 
+} */
+
+
+
+/* 時計表示部分用 */
+span.miniClock {
+    color: #ffffff;
+    font-size: 2.5vw;
+    background-color: rgb(1, 1, 1);
+    padding: 0.5vw 1vw 0.5vw 1vw;
+    border-radius: 0.8vw;
+    height: 3vw;
+    margin: 2vw;
+    text-align: center;
+    border: #fffdfd solid 1px;
+    float: right;
+    /* margin-right: 3vw; */
+}
+
+.center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+
+.canvas-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  /* margin: 0 10px; */
+}
+
+.canvas-label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 0.5vw;
+  color: #ffffff;
+  font-size: 2.5vw;
+}

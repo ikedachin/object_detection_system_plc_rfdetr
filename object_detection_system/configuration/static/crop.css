@@ -1,0 +1,834 @@
+.container { 
+    max-width: 1200px; 
+    margin: 0 auto; 
+    padding: 20px; 
+}
+
+.cropper-container { 
+    max-width: 800px !important;
+    max-height: 600px !important;
+    margin: 0 auto !important;
+    /* マウススクロール（ホイール）イベントを無効化 */
+    overflow: hidden;
+    /* ユーザー選択を無効化してドラッグ操作を明確にする */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Cropper内の要素でのスクロールイベントを無効化 */
+.cropper-container * {
+    pointer-events: auto;
+    /* ホイールイベントを受け取らないようにする */
+    overscroll-behavior: none;
+}
+
+.cropper-container .cropper-canvas,
+.cropper-container .cropper-drag-box,
+.cropper-container .cropper-crop-box {
+    /* ホイールイベントを無効化 */
+    pointer-events: auto;
+    /* スムーズスクロールを無効化 */
+    scroll-behavior: auto;
+}
+
+/* 画像自体のマウススクロールを無効化 */
+.cropper-container img {
+    /* 画像の直接操作を無効化 */
+    pointer-events: none;
+    /* ドラッグを無効化 */
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+}
+
+/* 画像コンテナのスクロール無効化 */
+.image-container {
+    overflow: hidden;
+    /* スクロール動作を制御 */
+    overscroll-behavior: contain;
+}
+
+#source-image {
+    /* 画像の基本的なスクロール無効化 */
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.preview-section { 
+    margin-top: 20px; 
+    text-align: center; 
+}
+
+.preview-canvas { 
+    border: 2px solid #ddd; 
+    max-width: 100%; 
+}
+
+.controls { 
+    margin: 20px 0; 
+    text-align: center; 
+}
+
+.btn { 
+    padding: 10px 20px; 
+    margin: 5px; 
+    background: #007bff; 
+    color: white; 
+    border: 1px solid #007bff; 
+    cursor: pointer; 
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover { 
+    background: #0056b3; 
+    border-color: #0056b3;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.info { 
+    margin: 10px 0; 
+    padding: 10px; 
+    background: #f8f9fa; 
+    border-radius: 5px; 
+}
+
+.file-selection-section {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #f9f9f9;
+}
+
+.file-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.file-input-group label {
+    font-weight: bold;
+    min-width: 120px;
+}
+
+.file-input-group input[type="text"] {
+    flex: 1;
+    min-width: 300px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.btn-secondary {
+    background: #6c757d;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.btn-primary {
+    background: #28a745;
+}
+
+.btn-primary:hover {
+    background: #218838;
+}
+
+.file-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    padding: 10px;
+}
+
+.file-item {
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    margin: 2px 0;
+}
+
+.file-item:hover {
+    background: #e9ecef;
+}
+
+.file-item.selected {
+    background: #007bff;
+    color: white;
+}
+
+.selection-tabs {
+    display: flex;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #ddd;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    border-bottom-color: #007bff;
+    color: #007bff;
+}
+
+.tab-btn:hover {
+    background: #f8f9fa;
+}
+
+.selection-method {
+    display: none;
+}
+
+.selection-method.active {
+    display: block;
+}
+
+.file-input-group select {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+}
+
+.file-input-group input[type="file"] {
+    flex: 1;
+    min-width: 300px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+}
+
+#custom-path {
+    margin-left: 10px;
+}
+
+#image-selection-group {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+/* モーダルスタイル */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h4 {
+    margin: 0;
+    color: #333;
+}
+
+.close {
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+}
+
+.close:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 20px;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* 画像グリッドスタイル */
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.image-item {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.image-item:hover {
+    border-color: #007bff;
+    transform: scale(1.05);
+}
+
+.image-item.selected {
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+}
+
+.image-item img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    display: block;
+}
+
+.image-item .image-name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 5px;
+    font-size: 12px;
+    text-align: center;
+    word-break: break-word;
+}
+
+#selected-image-info {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+#selected-image-name {
+    font-weight: bold;
+    color: #007bff;
+    margin-right: 15px;
+}
+
+/* 現在の画像ファイル名表示 */
+.current-image-info {
+    margin: 15px 0;
+    padding: 12px 15px;
+    background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+    border: 1px solid #2196f3;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.current-image-info h4 {
+    margin: 0 0 8px 0;
+    color: #1976d2;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.current-image-info #current-image-name {
+    font-size: 18px;
+    font-weight: 500;
+    color: #424242;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 6px 12px;
+    border-radius: 4px;
+    display: inline-block;
+    border: 1px solid #e0e0e0;
+}
+
+.image-section {
+    margin: 20px 0;
+}
+
+/* 画像表示とCropper.jsの制限強化 */
+.image-container {
+    max-width: 800px;
+    margin: 0 auto;
+    overflow: hidden;
+    position: relative;
+}
+
+#source-image {
+    max-width: 100%;
+    max-height: 600px;
+    width: auto;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.cropper-wrap-box,
+.cropper-canvas,
+.cropper-drag-box,
+.cropper-crop-box,
+.cropper-modal {
+    max-width: 800px !important;
+    max-height: 600px !important;
+}
+
+/* Cropperのビューボックスサイズ制限 */
+.cropper-view-box {
+    max-width: 800px !important;
+    max-height: 600px !important;
+}
+
+/* 座標蓄積エリアのスタイル */
+.coordinates-section {
+    margin: 20px 0;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #f9f9f9;
+}
+
+.coordinates-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+.coordinate-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    margin: 5px 0;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #007bff;
+    border: 1px solid #e9ecef;
+    margin-bottom: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.coordinate-item:hover {
+    background: #f1f3f4;
+}
+
+.coordinate-item.current-image-coordinate {
+    background: #f8f9fa;
+    border-left: 4px solid #007bff;
+}
+
+.coordinate-info {
+    flex: 1;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+.coordinate-main {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.coordinate-filename {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 250px;
+}
+
+.coordinate-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-small {
+    padding: 4px 8px;
+    font-size: 12px;
+    margin: 0;
+}
+
+.coordinates-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 0;
+}
+
+.coordinates-controls #coordinates-count {
+    margin-left: 0 !important;
+    color: #666;
+    font-weight: 500;
+    min-width: fit-content;
+}
+
+.coordinates-controls #download-all-btn {
+    background: #28a745;
+    color: white;
+    border: 1px solid #28a745;
+    font-weight: 600;
+    margin-left: 0 !important;
+    min-width: 200px;
+}
+
+.coordinates-controls #download-all-btn:hover {
+    background: #218838;
+    border-color: #1e7e34;
+}
+
+/* 小さな画面でのレスポンシブ対応 */
+@media (max-width: 768px) {
+    .coordinates-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    
+    .coordinates-controls button {
+        width: 100%;
+        margin: 0 !important;
+    }
+    
+    .coordinates-controls #coordinates-count {
+        text-align: center;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        margin: 0 !important;
+    }
+    
+    .coordinates-controls #download-all-btn {
+        min-width: auto;
+        font-size: 14px;
+    }
+}
+
+/* 包括座標表示エリア */
+.bounding-box-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, #f0f8ff, #e6f3ff);
+    border: 2px solid #4CAF50;
+    border-radius: 8px;
+}
+
+.bounding-box-section h4 {
+    margin: 0 0 10px 0;
+    color: #2E7D32;
+    font-size: 16px;
+}
+
+.bounding-box-info {
+    background: rgba(255, 255, 255, 0.9);
+    padding: 12px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    margin-bottom: 10px;
+}
+
+.bounding-box-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    text-align: center;
+}
+
+.bounding-box-controls .btn {
+    margin: 0;
+    min-width: 120px;
+}
+
+.bounding-box-controls #download-all-btn {
+    background: #28a745;
+    color: white;
+    border: 2px solid #28a745;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+    transition: all 0.3s ease;
+}
+
+.bounding-box-controls #download-all-btn:hover {
+    background: #218838;
+    border-color: #1e7e34;
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.4);
+    transform: translateY(-1px);
+}
+
+/* 画像ナビゲーション */
+.image-navigation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin: 15px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.image-counter {
+    font-weight: bold;
+    font-size: 16px;
+    color: #495057;
+    min-width: 80px;
+    text-align: center;
+}
+
+.image-navigation .btn {
+    background: #6c757d;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.image-navigation .btn:hover:not(:disabled) {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.image-navigation .btn:disabled {
+    background: #adb5bd;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* キーボードショートカット表示用スタイル */
+kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: #555;
+    background: #f7f7f7;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.2), inset 0 0 0 2px #fff;
+    font-family: monospace;
+    font-weight: bold;
+}
+
+/* ローディング表示スタイル */
+.spinner {
+    text-align: center;
+}
+
+/* 危険なアクション用のボタンスタイル */
+.btn-danger {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.btn-danger:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+/* 全体包括座標表示のスタイル */
+.global-bbox {
+    border: 2px solid #28a745;
+    margin-top: 15px;
+    background: rgba(40, 167, 69, 0.05);
+}
+
+.global-bbox h5 {
+    color: #28a745;
+    margin-bottom: 10px;
+}
+
+.global-details {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(0, 123, 255, 0.05);
+    border-left: 3px solid #007bff;
+    border-radius: 4px;
+}
+
+.global-details details {
+    cursor: pointer;
+}
+
+.global-details summary {
+    font-weight: bold;
+    color: #007bff;
+    padding: 5px 0;
+}
+
+.global-details ul {
+    margin: 10px 0 0 20px;
+    list-style-type: none;
+}
+
+.global-details li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0, 123, 255, 0.1);
+}
+
+.global-details li:last-child {
+    border-bottom: none;
+}
+
+.total-count {
+    font-size: 0.9em;
+    color: #28a745;
+    font-weight: normal;
+}
+
+/* 包括座標ボタンのスタイル */
+.bbox-buttons {
+    margin-top: 15px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.bbox-buttons button {
+    min-width: 120px;
+    padding: 8px 16px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.bbox-buttons .btn-save {
+    background: #28a745;
+}
+
+.bbox-buttons .btn-save:hover {
+    background: #218838;
+}
+
+.bbox-buttons .btn-download {
+    background: #007bff;
+    color: white;
+    border: 2px solid #0056b3;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.bbox-buttons .btn-download:hover {
+    background: #0056b3;
+    border-color: #004085;
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.bbox-buttons .btn-preview {
+    background: #17a2b8;
+    color: white;
+    border: 2px solid #138496;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(23, 162, 184, 0.3);
+    transition: all 0.3s ease;
+}
+
+.bbox-buttons .btn-preview:hover {
+    background: #138496;
+    border-color: #117a8b;
+    box-shadow: 0 4px 8px rgba(23, 162, 184, 0.4);
+    transform: translateY(-1px);
+}
+
+/* 包括座標セクションのスタイル */
+.bbox-section {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+.bbox-section.current-image-bbox {
+    border-left: 4px solid #17a2b8;
+}
+
+.bbox-section.global-bbox {
+    border-left: 4px solid #007bff;
+}
+
+.bbox-section h5 {
+    margin: 0 0 10px 0;
+    color: #495057;
+    font-weight: 600;
+}
+
+.bbox-section > div {
+    margin: 5px 0;
+    font-size: 14px;
+    color: #6c757d;
+}
+
+.bbox-section > div strong {
+    color: #495057;
+}

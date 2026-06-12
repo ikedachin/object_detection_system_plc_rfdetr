@@ -1,0 +1,14 @@
+# RF-DETR Detection Settings
+RF_DETR:
+  model_path:
+  model_name: Roboflow/rf-detr-large
+  num_queries:
+  num_classes:
+  num_select:
+  class_names: []
+  detect_config:
+    conf: 0.45
+    verbose: false
+
+image_size:
+  type: HD1080p

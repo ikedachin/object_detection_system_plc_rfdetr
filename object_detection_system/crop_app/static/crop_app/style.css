@@ -1,0 +1,1029 @@
+/* style.css - 統合されたCSSファイル (crop_app用) */
+
+/* ================================
+   1. 一般的なスタイル (annotatorから)
+   ================================ */
+
+/* カスタムスタイル */
+.canvas-container {
+    text-align: center;
+    overflow: auto;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px;
+    position: relative; /* 追加: ホバー中のバウンディングボックスハイライト用 */
+}
+
+#annotation-canvas {
+    max-width: 100%;
+    max-height: 70vh;
+    display: block;
+    margin: 0 auto;
+    background-color: #ffffff;
+    border: 2px solid #dee2e6 !important;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.label-btn.active {
+    background-color: var(--bs-primary) !important;
+    color: white !important;
+    border-color: var(--bs-primary) !important;
+}
+
+.annotation-item {
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.annotation-item:hover {
+    background-color: #e9ecef;
+    border-color: #007bff;
+    box-shadow: 0 2px 4px rgba(0,123,255,0.2);
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+.annotation-item.highlighted {
+    border-color: #007bff;
+    background-color: #e7f3ff;
+}
+
+.annotation-label {
+    font-weight: bold;
+    margin-bottom: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 2px solid;
+    display: inline-block;
+    background-color: rgba(255, 255, 255, 0.9);
+    color: #000000 !important;
+}
+
+.annotation-coords {
+    font-size: 0.8em;
+    color: #666;
+}
+
+.delete-annotation {
+    float: right;
+    color: #dc3545;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.delete-annotation:hover {
+    color: #a71e2a;
+}
+
+
+/* 表示切り替えボタンのスタイル */
+.btn-group .btn.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: white;
+}
+
+/* リスト表示のスタイル */
+#images-list .list-group-item {
+    transition: background-color 0.2s ease;
+}
+
+#images-list .list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+#images-list .img-thumbnail {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+}
+
+/* グリッド表示とリスト表示の切り替え */
+.view-transition {
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* モーダルbackdropの問題を防ぐ */
+.modal-backdrop.show {
+    opacity: 0.5;
+}
+
+/* 重複したbackdropの問題を防ぐ */
+body:not(.modal-open) .modal-backdrop {
+    display: none !important;
+}
+
+/* モーダルが完全に閉じられた時のクリーンアップ */
+body.modal-backdrop-cleanup {
+    overflow: auto !important;
+    padding-right: 0 !important;
+}
+
+body.modal-backdrop-cleanup .modal-backdrop {
+    display: none !important;
+}
+
+.view-hidden {
+    opacity: 0;
+}
+
+/* ステータスバッジ */
+.badge {
+    font-size: 0.75em;
+}
+
+/* ラベルバッジのカスタムスタイル */
+.label-badge {
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ラベル管理のスタイル */
+.label-item {
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 4px;
+    margin-bottom: 4px;
+    background-color: #f8f9fa;
+}
+
+.label-item:hover {
+    background-color: #e9ecef;
+}
+
+.color-indicator {
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.form-control-color {
+    width: 50px !important;
+    height: 38px !important;
+}
+
+/* インデックス画面のラベル一覧のスタイル */
+#labels-list .label-item {
+    transition: background-color 0.2s ease;
+}
+
+#labels-list .btn-group .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+/* ローディングやエラーの表示用 */
+.canvas-status {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 10;
+}
+
+.loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* アノテーション画面のラベルボタンスタイル */
+.label-btn {
+    transition: all 0.2s ease;
+    border-width: 2px !important;
+    color: #000000 !important;
+}
+
+.label-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    color: #000000 !important;
+}
+
+.label-btn.active {
+    background-color: var(--bs-primary) !important;
+    border-color: var(--bs-primary) !important;
+    color: white !important;
+    box-shadow: 0 2px 8px rgba(0,123,255,0.3);
+}
+
+/* ラベル編集選択モーダルのスタイル */
+.color-indicator {
+    flex-shrink: 0;
+}
+
+#edit-label-list .list-group-item.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#edit-label-list .list-group-item:not(.disabled):hover {
+    background-color: #f8f9fa;
+}
+
+/* ホバー中のバウンディングボックスハイライト用のキャンバスオーバーレイ */
+#annotation-canvas-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* ================================
+   2. crop_app 専用スタイル
+   ================================ */
+
+.container { 
+    max-width: 1200px; 
+    margin: 0 ; 
+    padding: 20px; 
+}
+
+.cropper-container { 
+    top : 0;
+    left: 0;
+    position: relative;
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    visibility: visible !important;
+    margin: 0;
+    /* マウススクロール（ホイール）イベントを無効化 */
+    overflow: hidden;
+    /* ユーザー選択を無効化してドラッグ操作を明確にする */
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Cropper内の要素でのスクロールイベントを無効化 */
+.cropper-container * {
+    pointer-events: auto;
+    /* ホイールイベントを受け取らないようにする */
+    overscroll-behavior: none;
+}
+
+.cropper-container .cropper-canvas,
+.cropper-container .cropper-drag-box,
+.cropper-wrap-box,
+.cropper-container .cropper-crop-box {
+    /* ホイールイベントを無効化 */
+    pointer-events: auto;
+    /* スムーズスクロールを無効化 */
+    scroll-behavior: auto;
+    margin: 0;
+}
+
+/* 画像自体のマウススクロールを無効化 */
+.cropper-container img {
+    /* 画像の直接操作を無効化 */
+    pointer-events: none;
+    /* ドラッグを無効化 */
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+}
+
+
+#source-image {
+    /* 画像の基本的なスクロール無効化 */
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* 画像表示エリアの画像を常に幅いっぱいに表示し、競合を防ぐ */
+#image-container {
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: auto;
+    overscroll-behavior: contain;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+
+#cropper-inner-wrapper {
+    /* padding: 10px; */
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+#cropper-inner-wrapper img,
+#source-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+#source-image {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+
+/* 画像選択モーダルのスタイル */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex !important;
+}
+
+.modal-dialog {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+    margin: 1.75rem auto;
+}
+
+.modal-content {
+    background-color: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-body {
+    padding: 1rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+/* 画像グリッドのスタイル */
+.image-item {
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    cursor: pointer;
+}
+
+.image-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.image-item.border-primary {
+    border-color: #0d6efd !important;
+    box-shadow: 0 0 10px rgba(13, 110, 253, 0.5);
+}
+
+.image-item img {
+    border-radius: 0.375rem 0.375rem 0 0;
+}
+
+/* 座標リストのスタイル */
+.coordinate-item {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    transition: background-color 0.2s ease;
+}
+
+.coordinate-item:hover {
+    background-color: #e9ecef;
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+/* 包括座標プレビューモードのスタイル */
+.cropper-container.preview-mode .cropper-crop-box {
+    border-color: #ffc107 !important;
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.5) !important;
+}
+
+.cropper-container.preview-mode .cropper-view-box {
+    outline-color: #ffc107 !important;
+}
+
+
+/* プレースホルダーのスタイル */
+#image-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    color: #6c757d;
+    font-size: 1.1rem;
+    font-weight: 500;
+    height: 100%;
+    min-height: 400px;
+    text-align: center;
+}
+
+/* no-imageクラスが付いている時のスタイル */
+.no-image #image-placeholder {
+    display: flex !important;
+}
+
+.no-image #source-image {
+    display: none !important;
+}
+
+/* ボタンの無効化スタイル */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* 画像ナビゲーション */
+#image-navigation {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+/* 包括座標情報ボックス */
+#bounding-box-section {
+    background-color: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+#bounding-box-preview {
+    animation: fadeIn 0.3s ease;
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal.show .modal-content {
+    animation: slideUp 0.3s ease;
+}
+/* ================================
+3. レスポンシブ対応
+================================ */
+/* 
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 0 10px;
+    }
+    
+    #annotation-canvas {
+        max-height: 50vh;
+    }
+    
+    .btn-sm {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .modal-dialog {
+        max-width: 95%;
+        margin: 0.5rem;
+    }
+    
+    .modal-body {
+        max-height: 50vh;
+    }
+    
+    .image-item img {
+        height: 80px !important;
+    }
+    
+    .coordinate-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .coordinate-item button {
+        align-self: flex-end;
+        margin-top: 8px;
+    }
+    
+    #image-placeholder {
+        min-height: 300px;
+        font-size: 1rem;
+    }
+} */
+
+#image-container.cropper-active #source-image {
+    display: none !important;
+}
+
+
+
+/* // from html */
+
+/* 画像コンテナの基本設定 - Cropper.js使用時の調整 */
+#image-container {
+    width: 100%;
+    max-width: 100% !important;
+    min-height: 400px; /* モバイルでは300pxに変更 */
+    max-height: 80vh ;
+    position: relative !important;
+    background-color: #f8f9fa !important;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 8px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Cropper使用時はoverflowをvisibleに */
+#image-container:has(.cropper-container),
+#image-container.cropper-active {
+    overflow: visible !important;
+    /* min-height: 500px !important; */
+}
+
+/* 通常時（Cropperなし）はoverflowをhidden */
+#image-container:not(.cropper-active) {
+    overflow: hidden !important;
+}
+
+/* 画像が読み込まれていない時のデフォルト高さ */
+#image-container.no-image {
+    height: 600px !important;
+    overflow: hidden !important;
+}
+
+/* 画像が読み込まれた時は動的な高さ */
+#image-container:not(.no-image) {
+    min-height: 300px !important;
+    min-height: 300px;
+}
+
+/* アスペクト比が設定された時の優先スタイル */
+#image-container.aspect-ratio-set {
+    height: var(--calculated-height) !important;
+    min-height: unset !important;
+}
+
+/* Cropper使用時は特別な設定 */
+#image-container.cropper-active {
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 500px !important;
+}
+
+/* Cropper使用時の強制表示設定 */
+#image-container.cropper-active .cropper-container,
+#image-container.cropper-active .cropper-crop-box,
+#image-container.cropper-active .cropper-view-box {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 画像の基本設定 - 横幅固定、アスペクト比保持 */
+#source-image {
+    width: 100% !important;
+    max-width: 800px !important; /* 780→800に統一 */
+    height: auto !important;
+    object-fit: contain !important;
+    border-radius: 4px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    display: block !important;
+}
+
+/* 画像がない時の表示 */
+.no-image::before {
+    content: "画像表示エリア";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    color: #666;
+    font-weight: bold;
+    text-align: center;
+    z-index: 1;
+}
+
+/* 画像がない時のimg要素非表示 */
+.no-image #source-image {
+    display: none;
+}
+
+/* 画像がある時のimg要素表示 */
+#image-container:not(.no-image) #source-image {
+    display: block;
+}
+
+.cropper-canvas {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    visibility: visible !important;
+}
+
+.cropper-canvas > img {
+    max-width: none !important;
+    max-height: none !important;
+    display: block !important;
+    visibility: visible !important;
+}
+
+.cropper-crop-box {
+    border: 2px solid #007bff !important;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5) !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: absolute !important;
+    z-index: 10 !important;
+}
+
+/* Cropperの各要素を強制表示 */
+.cropper-view-box,
+.cropper-dashed,
+.cropper-center,
+.cropper-point,
+.cropper-line,
+.cropper-face {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Cropperのコンテナとクロップボックスを最優先で表示 */
+.cropper-container {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 10 !important;
+}
+
+.cropper-crop-box {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: absolute !important;
+    z-index: 11 !important;
+    border: 2px solid #007bff !important;
+}
+
+/* Cropperの各ポイント（ハンドル）を強制表示 */
+.cropper-point {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 0.75 !important;
+    position: absolute !important;
+    z-index: 12 !important;
+    background-color: #007bff !important;
+    width: 5px !important;
+    height: 5px !important;
+}
+
+/* Cropperの各ライン（境界線）を強制表示 */
+.cropper-line {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 0.1 !important;
+    position: absolute !important;
+    z-index: 12 !important;
+    background-color: #007bff !important;
+}
+
+/* Cropper.jsが自動付与するクラスのオーバーライド */
+.cropper-hidden {
+    /* Cropper.jsが画像を隠すのを防ぐ */
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Cropper関連の全要素を最強優先で表示 */
+.cropper-container,
+.cropper-container *,
+.cropper-wrap-box,
+.cropper-canvas,
+.cropper-drag-box,
+.cropper-crop-box,
+.cropper-view-box {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+}
+
+/* 特にクロップボックスとポイントを最優先で表示 */
+.cropper-crop-box,
+.cropper-point,
+.cropper-line,
+.cropper-face {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: absolute !important;
+    z-index: 15 !important;
+}
+
+/* ポイントの詳細スタイル */
+.cropper-point {
+    background-color: #007bff !important;
+    width: 5px !important;
+    height: 5px !important;
+    border: 1px solid #ffffff !important;
+    border-radius: 50% !important;
+}
+
+/* ドラッグボックスの可視性確保 */
+.cropper-drag-box {
+    opacity: 0 !important; /* 透明だが存在する */
+    cursor: move !important;
+}
+
+/* モーダル背景（暗い部分）の調整 */
+.cropper-modal {
+    opacity: 0.5 !important;
+    background-color: #000000 !important;
+}
+
+/* 点線のボーダー */
+.cropper-dashed {
+    border: 0 dashed #eee !important;
+    opacity: 0.5 !important;
+}
+
+.cropper-dashed.dashed-h {
+    border-bottom-width: 1px !important;
+    border-top-width: 1px !important;
+    height: calc(100% / 3) !important;
+    left: 0 !important;
+    top: calc(100% / 3) !important;
+    width: 100% !important;
+}
+
+.cropper-dashed.dashed-v {
+    border-left-width: 1px !important;
+    border-right-width: 1px !important;
+    height: 100% !important;
+    left: calc(100% / 3) !important;
+    top: 0 !important;
+    width: calc(100% / 3) !important;
+}
+
+/* 中央の十字マーク */
+.cropper-center {
+    background-color: #007bff !important;
+    height: 20px !important;
+    left: 50% !important;
+    margin-left: -10px !important;
+    margin-top: -10px !important;
+    opacity: 0.75 !important;
+    top: 50% !important;
+    width: 20px !important;
+}
+
+.cropper-center::before,
+.cropper-center::after {
+    background-color: #fff !important;
+    content: ' ' !important;
+    display: block !important;
+    position: absolute !important;
+}
+
+.cropper-center::before {
+    height: 2px !important;
+    left: 50% !important;
+    margin-left: -8px !important;
+    top: 50% !important;
+    margin-top: -1px !important;
+    width: 16px !important;
+}
+
+.cropper-center::after {
+    height: 16px !important;
+    left: 50% !important;
+    margin-left: -1px !important;
+    margin-top: -8px !important;
+    top: 50% !important;
+    width: 2px !important;
+}
+
+/* リサイズポイント */
+.cropper-point {
+    background-color: #007bff !important;
+    height: 5px !important;
+    opacity: 0.75 !important;
+    width: 5px !important;
+}
+
+.cropper-point.point-e {
+    cursor: ew-resize !important;
+    margin-top: -3px !important;
+    right: -3px !important;
+    top: 50% !important;
+}
+
+.cropper-point.point-n {
+    cursor: ns-resize !important;
+    left: 50% !important;
+    margin-left: -3px !important;
+    top: -3px !important;
+}
+
+.cropper-point.point-w {
+    cursor: ew-resize !important;
+    left: -3px !important;
+    margin-top: -3px !important;
+    top: 50% !important;
+}
+
+.cropper-point.point-s {
+    bottom: -3px !important;
+    cursor: ns-resize !important;
+    left: 50% !important;
+    margin-left: -3px !important;
+}
+
+.cropper-point.point-ne {
+    cursor: nesw-resize !important;
+    right: -3px !important;
+    top: -3px !important;
+}
+
+.cropper-point.point-nw {
+    cursor: nw-resize !important;
+    left: -3px !important;
+    top: -3px !important;
+}
+
+.cropper-point.point-sw {
+    bottom: -3px !important;
+    cursor: sw-resize !important;
+    left: -3px !important;
+}
+
+.cropper-point.point-se {
+    bottom: -3px !important;
+    cursor: se-resize !important;
+    right: -3px !important;
+}
+
+/* リサイズライン */
+.cropper-line {
+    background-color: #007bff !important;
+    opacity: 0.1 !important;
+}
+
+.cropper-line.line-e {
+    cursor: ew-resize !important;
+    right: -3px !important;
+    top: 0 !important;
+    width: 5px !important;
+    height: 100% !important;
+}
+
+.cropper-line.line-n {
+    cursor: ns-resize !important;
+    height: 5px !important;
+    left: 0 !important;
+    top: -3px !important;
+    width: 100% !important;
+}
+
+.cropper-line.line-w {
+    cursor: ew-resize !important;
+    left: -3px !important;
+    top: 0 !important;
+    width: 5px !important;
+    height: 100% !important;
+}
+
+.cropper-line.line-s {
+    bottom: -3px !important;
+    cursor: ns-resize !important;
+    height: 5px !important;
+    left: 0 !important;
+    width: 100% !important;
+}
+
+/* フェイス（ドラッグエリア） */
+.cropper-face {
+    background-color: inherit !important;
+    cursor: move !important;
+    height: 100% !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+}
+
+/* 包括座標プレビュー時の特別なスタイル */
+.cropper-container.preview-mode .cropper-crop-box {
+    border: 3px solid #ffc107 !important;
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.5) !important;
+}
+
+.cropper-container.preview-mode .cropper-dashed {
+    border-color: #ffc107 !important;
+}
+
+.cropper-container.preview-mode .cropper-center {
+    background-color: #ffc107 !important;
+}
+
+/* レスポンシブ対応 - モバイル端末での横幅調整 */
+@media (max-width: 768px) {
+    #image-container {
+        width: 100% !important;
+        min-height: 250px !important;
+        max-height: 60vh !important;
+    }
+    
+    #image-container.no-image {
+        height: 400px !important;
+    }
+    
+    .cropper-container {
+        max-width: 100% !important;
+    }
+    
+    #source-image {
+        max-width: calc(100% - 10px) !important;
+    }
+    
+    .no-image::before {
+        font-size: 18px;
+    }
+}

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アノテーション - {{ image.filename }}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet"> -->
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'annotator:index' %}">
+                <strong>RF-DETR アノテーター</strong>
+            </a>
+
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text">{{ image.filename }}  </span>
+            </div>
+            <a class="nav-link text-white" href="{% url 'configuration:configuration' %}">
+                <i class="bi bi-house"></i> 設定ページに戻る
+            </a>
+            <a class="nav-link text-white" href="/configuration/workflow-manager/">
+                <i class="bi bi-diagram-3"></i> ワークフロー管理に戻る
+            </a>
+        </div>
+    </nav>
+    
+    <div class="container-fluid mt-3">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">アノテーション</h5>
+                        <div class="d-flex gap-2">
+                            <button id="save-btn" class="btn btn-success btn-sm">保存</button>
+                            <button id="clear-all-btn" class="btn btn-danger btn-sm">全削除</button>
+                            <a href="{% url 'annotator:index' %}" class="btn btn-outline-secondary btn-sm" title="トップページに戻る">
+                                <i class="bi bi-house"></i> アノテーション管理画面
+                            </a>
+                            <div class="btn-group" role="group">
+                                {% if prev_image %}
+                                <button type="button" id="prev-btn" class="btn btn-outline-primary btn-sm" 
+                                        data-prev-url="{% url 'annotator:annotate' prev_image.id cropped %}" title="前の画像">
+                                    <i class="bi bi-chevron-left"></i> 前
+                                </button>
+                                {% endif %}
+                                {% if next_image %}
+                                <button type="button" id="next-btn" class="btn btn-outline-primary btn-sm" 
+                                        data-next-url="{% url 'annotator:annotate' next_image.id cropped %}" title="次の画像">
+                                    次 <i class="bi bi-chevron-right"></i>
+                                </button>
+                                {% endif %}
+                                {% if not next_image and not prev_image %}
+                                <a href="{% url 'annotator:index' %}" class="btn btn-secondary btn-sm">一覧に戻る</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="canvas-container" style="position: relative;">
+                            <!-- キャンバスは画像の上に重ねて配置する場合はJSで制御 -->
+                            <!-- <canvas id="annotation-canvas" width="400" height="400" style="border: 1px solid #ccc; cursor: crosshair; background-color: #f0f0f0;"></canvas> -->
+                            <canvas id="annotation-canvas" width="400" height="400" style="left: 0; top: 0; border: 1px solid #ccc; cursor: crosshair;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">ラベル選択</h6>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-success btn-sm" id="add-label-btn" title="ラベル追加">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="edit-label-btn" title="ラベル編集">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="label-buttons">
+                            {% for label in labels %}
+                            <button class="btn btn-outline-primary btn-sm me-2 mb-2 label-btn" 
+                                    data-label-id="{{ label.id }}" 
+                                    data-label-name="{{ label.name }}"
+                                    data-label-color="{{ label.color }}"
+                                    data-label-active="{{ label.is_active|yesno:'true,false' }}"
+                                    title="クリックで選択">
+                                {{ label.name }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-3">
+                            <strong>選択中:</strong> <span id="selected-label">なし</span>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> ラベルをクリックして選択し、画像上でアノテーションを作成してください
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6>アノテーション一覧</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="annotations-list">
+                            <!-- アノテーション一覧がここに表示される -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6>操作方法</h6>
+                    </div>
+                    <div class="card-body">
+                        <small>
+                            <ol>
+                                <li>ラベルを選択</li>
+                                <li>画像上でドラッグして矩形を描画</li>
+                                <li>「保存」ボタンで手動保存、または画像切り替え時に自動保存</li>
+                                <li>ナビゲーション：
+                                    <ul>
+                                        <li>「前」「次」ボタンで画像切り替え（自動保存）</li>
+                                        <li>←/→キーでも画像切り替え可能</li>
+                                    </ul>
+                                </li>
+                            </ol>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6>キーボードショートカット</h6>
+                    </div>
+                    <div class="card-body">
+                        <small>
+                            <ul class="list-unstyled">
+                                <li><kbd>←</kbd> 前の画像</li>
+                                <li><kbd>→</kbd> 次の画像</li>
+                                <li><kbd>Ctrl+S</kbd> 保存</li>
+                            </ul>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ラベル追加/編集モーダル -->
+    <div class="modal fade" id="labelModal" tabindex="-1" aria-labelledby="labelModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="labelModalLabel">ラベルを追加</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="labelForm">
+                        <div class="mb-3">
+                            <label for="labelName" class="form-label">ラベル名</label>
+                            <input type="text" class="form-control" id="labelName" required autocomplete="off" tabindex="1">
+                        </div>
+                        <div class="mb-3">
+                            <label for="labelColor" class="form-label">色</label>
+                            <input type="color" class="form-control form-control-color" id="labelColor" value="#FF0000">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" id="saveLabelBtn">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ラベル編集選択モーダル -->
+    <div class="modal fade" id="editLabelSelectModal" tabindex="-1" aria-labelledby="editLabelSelectModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editLabelSelectModalLabel">編集するラベルを選択</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="list-group" id="edit-label-list">
+                        <!-- ラベル一覧がここに動的に表示される -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // プロジェクトが選択されているかチェック
+        window.projectSelected = {% if current_project %}true{% else %}false{% endif %};
+        {% if current_project %}
+        // 画像データとアノテーションデータをJSに渡す
+        window.imageData = {
+            id: {{ image.id|default:'null' }},
+            filename: "{{ image.filename|escapejs }}",
+            width: {{ image.width|default:'null' }},
+            height: {{ image.height|default:'null' }},
+            url: "{{ image_url|escapejs }}"
+        };
+        window.labelsData = [
+            {% for label in labels %}{
+                id: {{ label.id|default:'null' }},
+                name: "{{ label.name|escapejs }}",
+                color: "{{ label.color|escapejs }}"
+            }{% if not forloop.last %},{% endif %}{% endfor %}
+        ];
+        window.existingAnnotations = [
+            {% for annotation in annotations %}{
+                id: {{ annotation.id|default:'null' }},
+                label_id: {{ annotation.label.id|default:'null' }},
+                label_name: "{{ annotation.label.name|escapejs }}",
+                label_color: "{{ annotation.label.color|escapejs }}",
+                x_center: {{ annotation.x_center|default:'null' }},
+                y_center: {{ annotation.y_center|default:'null' }},
+                width: {{ annotation.width|default:'null' }},
+                height: {{ annotation.height|default:'null' }}
+            }{% if not forloop.last %},{% endif %}{% endfor %}
+        ];
+        console.log('Data loaded:', {
+            imageData: window.imageData,
+            labelsData: window.labelsData,
+            existingAnnotations: window.existingAnnotations
+        });
+        {% else %}
+        console.log('プロジェクトが選択されていません');
+        {% endif %}
+    </script>
+    <script>
+        // Django データの読み込み
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded - initializing application');
+            
+            if (!window.projectSelected) {
+                // プロジェクトが選択されていない場合は、プロジェクト選択画面に誘導
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-warning mt-3';
+                alertDiv.innerHTML = `
+                    <i class="bi bi-exclamation-triangle"></i>
+                    プロジェクトを選択してください。
+                    <a href="{% url 'annotator:project' %}" class="btn btn-warning btn-sm ms-2">
+                        <i class="bi bi-folder"></i> プロジェクト選択
+                    </a>
+                `;
+                document.querySelector('.container').prepend(alertDiv);
+                return;
+            }
+            
+            // データが正しく読み込まれているかチェック
+            if (typeof imageData !== 'undefined') {
+                console.log('Image data loaded:', imageData);
+            } else {
+                console.error('Image data not found!');
+            }
+            
+            if (typeof labelsData !== 'undefined') {
+                console.log('Labels data loaded:', labelsData);
+            } else {
+                console.error('Labels data not found!');
+            }
+            
+            if (typeof existingAnnotations !== 'undefined') {
+                console.log('Existing annotations loaded:', existingAnnotations);
+            } else {
+                console.error('Existing annotations not found!');
+            }
+        });
+    </script>
+    <script src="{% static 'js/annotator.js' %}"></script>
+    <script>
+        // 追加のデバッグ情報
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript error:', e.error, e.filename, e.lineno);
+        });
+        
+        // 画像読み込み失敗のグローバルハンドラ
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled promise rejection:', e.reason);
+        });
+    </script>
+</body>
+</html>

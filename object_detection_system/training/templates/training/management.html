@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学習管理</title>
+    {% load static %}
+    <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #e8f5e9 0%, #b2dfdb 100%);
+        }
+        .navbar-orange {
+            background: linear-gradient(90deg, #43a047 0%, #a5d6a7 100%);
+        }
+        .card-header {
+            background-color: #43a047 !important;
+            color: #fff !important;
+            border: none;
+            letter-spacing: 0.03em;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.10);
+        }
+        .active-model {
+            background-color: #e8f5e9;
+            border-left: 4px solid #43a047;
+        }
+        .btn-sm {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark navbar-orange shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="#"> 🧠 RF-DETR学習管理システム</a>
+    </div>
+</nav>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>学習モデル管理</h2>
+        <a href="{% url 'training_index' %}" class="btn btn-primary">新しい学習を開始</a>
+    </div>
+    
+    {% for project in projects %}
+    <div class="card shadow-lg mb-4">
+        <div class="card-header">
+            <h4 class="mb-0">
+                <i class="bi bi-folder2-open"></i> {{ project.name }}
+                {% if project.is_active %}
+                    <span class="badge bg-success ms-2">アクティブプロジェクト</span>
+                {% endif %}
+            </h4>
+        </div>
+        <div class="card-body">
+            {% if project.training_runs.all %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>学習名</th>
+                                <th>データ種別</th>
+                                <th>学習日時</th>
+                                <th>エポック数</th>
+                                <th>状態</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for training in project.training_runs.all %}
+                            <tr {% if training.is_active %}class="active-model"{% endif %}>
+                                <td>
+                                    <strong>{{ training.training_name }}</strong>
+                                    {% if training.is_active %}
+                                        <span class="badge bg-primary ms-2">アクティブ</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ training.data_type }}</td>
+                                <td>{{ training.trained_at|date:"Y-m-d H:i" }}</td>
+                                <td>{{ training.epochs }}</td>
+                                <td>
+                                    {% if training.saved_model_path %}
+                                        <span class="badge bg-success">完了</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">処理中</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not training.is_active %}
+                                        <button class="btn btn-outline-primary btn-sm set-active-btn" 
+                                                data-training-id="{{ training.id }}"
+                                                data-training-name="{{ training.training_name }}">
+                                            アクティブにする
+                                        </button>
+                                    {% endif %}
+                                    <button class="btn btn-outline-danger btn-sm delete-btn" 
+                                            data-training-id="{{ training.id }}"
+                                            data-training-name="{{ training.training_name }}">
+                                        削除
+                                    </button>
+                                    {% if training.saved_model_path %}
+                                        <a href="#" class="btn btn-outline-info btn-sm">詳細</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> このプロジェクトには学習履歴がありません。
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i> プロジェクトが見つかりません。
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 確認モーダル -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">確認</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" id="confirmBtn">実行</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    let currentAction = null;
+    let currentTrainingId = null;
+
+    // アクティブ設定ボタン
+    document.querySelectorAll('.set-active-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentAction = 'set_active';
+            currentTrainingId = this.dataset.trainingId;
+            const trainingName = this.dataset.trainingName;
+            
+            document.getElementById('confirmModalTitle').textContent = 'アクティブモデル変更';
+            document.getElementById('confirmModalBody').innerHTML = 
+                `<p><strong>${trainingName}</strong> をアクティブなモデルに設定しますか？</p>
+                 <p class="text-warning"><small>現在アクティブなモデルは自動的に非アクティブになります。</small></p>`;
+            confirmModal.show();
+        });
+    });
+
+    // 削除ボタン
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentAction = 'delete';
+            currentTrainingId = this.dataset.trainingId;
+            const trainingName = this.dataset.trainingName;
+            
+            document.getElementById('confirmModalTitle').textContent = '学習モデル削除';
+            document.getElementById('confirmModalBody').innerHTML = 
+                `<p><strong>${trainingName}</strong> を削除しますか？</p>
+                 <p class="text-danger"><small>この操作は取り消せません。</small></p>`;
+            confirmModal.show();
+        });
+    });
+
+    // 確認ボタン
+    document.getElementById('confirmBtn').addEventListener('click', function() {
+        if (currentAction && currentTrainingId) {
+            const formData = new FormData();
+            formData.append('action', currentAction);
+            formData.append('training_id', currentTrainingId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('エラー: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('エラーが発生しました');
+            });
+            
+            confirmModal.hide();
+        }
+    });
+});
+</script>
+</body>
+</html>

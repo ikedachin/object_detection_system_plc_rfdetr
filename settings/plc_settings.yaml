@@ -1,0 +1,48 @@
+plc:
+  enabled: false
+
+test_server:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8010
+  base_url: "http://127.0.0.1:8010"
+
+connection:
+  host: "127.0.0.1"
+  port: 8010
+  # host: "192.168.250.1"
+  # port: 9600
+  plc_node: 1
+  pc_node: 25
+  timeout: 3.0
+
+monitor:
+  area: "D"
+  word_address: 100
+  bit: 0
+  poll_interval_seconds: 1.0
+
+result_signal:
+  complete:
+    area: "D"
+    word_address: 200
+    bit: 0
+    on_value: 1
+    reset_value: 0
+  ok:
+    area: "D"
+    word_address: 200
+    bit: 1
+    ok_value: 1
+    ng_value: 0
+    reset_value: 0
+  error:
+    area: "D"
+    word_address: 200
+    bit: 2
+    on_value: 1
+    reset_value: 0
+  reset_by_equipment: true
+
+behavior:
+  reset_value: 0

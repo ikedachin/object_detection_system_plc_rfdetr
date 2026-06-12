@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アノテーションツール</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet"> -->
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'annotator:index' %}">
+                <strong>RF-DETRアノテーション - 管理画面</strong>
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link text-white" href="{% url 'configuration:configuration' %}">
+                    <i class="bi bi-house"></i> 設定ページに戻る
+                </a>
+                <a class="nav-link text-white" href="/configuration/workflow-manager/">
+                    <i class="bi bi-diagram-3"></i> ワークフロー管理に戻る
+                </a>
+                <!-- <a class="nav-link text-white" href="{% url 'annotator:project' %}">
+                    <i class="bi bi-folder"></i> プロジェクト選択
+                </a> -->
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <!-- プロジェクト情報 -->
+        <div class="row mb-3">
+            <div class="col-12">
+                {% if current_project %}
+                <div class="alert alert-primary d-flex align-items-center">
+                    <i class="bi bi-folder-fill me-2"></i>
+                    <div>
+                        <strong>現在のプロジェクト:</strong> {{ current_project.name }}
+                        <!-- <small class="text-muted ms-2">({{ current_project.folder_name }})</small> -->
+                        <br>
+                        <span class="badge bg-info text-dark mt-1" id="image-type-badge">
+                            {% if cropped_or_not == "cropped" %}
+                                <i class="bi bi-crop"></i> crop画像を使用中
+                            {% else %}
+                                <i class="bi bi-image"></i> オリジナル画像を使用中
+                            {% endif %}
+                        </span>
+                    </div>
+                    <a href="{% url 'annotator:project' %}" class="btn btn-outline-primary btn-sm ms-auto">
+                        <i class="bi bi-pencil"></i> 変更
+                    </a>
+                </div>
+                {% else %}
+                <div class="alert alert-warning d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <div>
+                        <strong>プロジェクトが選択されていません。</strong><br>
+                        <small>プロジェクトを選択すると、該当する画像が自動的に読み込まれます。</small>
+                    </div>
+                    <a href="{% url 'annotator:project' %}" class="btn btn-warning btn-sm ms-auto">
+                        <i class="bi bi-folder"></i> プロジェクトを選択
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if current_project %}
+        <div class="row">
+            <div class="col-md-8">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2>画像一覧</h2>
+                    <div class="btn-group" role="group" aria-label="表示切り替え">
+                        <button type="button" class="btn btn-outline-secondary" id="grid-view-btn" title="グリッド表示">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="list-view-btn" title="リスト表示">
+                            <i class="bi bi-list"></i>
+                        </button>
+                    </div>
+                </div>
+                {% if images %}
+                <div class="mb-3">
+                    <button id="split-dataset-btn" class="btn btn-warning">データセット分割</button>
+                </div>
+                {% else %}
+                <div class="mb-3">
+                    <button id="load-project-images-btn" class="btn btn-success" data-project-id="{{ current_project.id }}">
+                        <i class="bi bi-download"></i> プロジェクト画像を読み込み
+                    </button>
+                </div>
+                {% endif %}
+                
+                <!-- グリッド表示 -->
+                <div class="row" id="images-grid">
+                    {% for image in images %}
+                    <div class="col-md-3 mb-3 image-item" data-filename="{{ image.filename }}" data-width="{{ image.width }}" data-height="{{ image.height }}" data-annotated="{{ image.is_annotated|yesno:'true,false' }}">
+                        <div class="card">
+                            <img src="{% url 'annotator:get_thumbnail' image.id cropped %}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="{{ image.filename }}">
+                            <!-- <img src="{{ projects_dir }} /{% if use_cropped %}/cropped{% else %}/data_collection{% endif %}/{{ image.filename }}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="{{ image.filename }}"> -->
+                            <div class="card-body">
+                                <h6 class="card-title">{{ image.filename }}</h6>
+                                <p class="card-text">
+                                    <small class="text-muted">{{ image.width }}x{{ image.height }}</small>
+                                    {% if image.is_annotated %}
+                                        <span class="badge bg-success">完了</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">未完了</span>
+                                    {% endif %}
+                                </p>
+                                <a href="{% url 'annotator:annotate' image.id cropped %}" class="btn btn-primary btn-sm">アノテーション</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <h5><i class="bi bi-info-circle"></i> 画像がありません</h5>
+                            <p>現在選択中のプロジェクト「<strong>{{ current_project.name }}</strong>」に画像が読み込まれていません。</p>
+                            <div class="d-grid gap-2 d-md-block">
+                                <button id="load-project-images-btn-empty" class="btn btn-primary" data-project-id="{{ current_project.id }}">
+                                    <i class="bi bi-download"></i> 今すぐ画像を読み込み
+                                </button>
+                                <a href="{% url 'configuration:project_manager' %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-folder"></i> プロジェクト選択画面へ
+                                </a>
+                            </div>
+                            <hr>
+                            <!-- <small class="text-muted">
+                                <strong>注意:</strong> 画像ファイルは data_collection/{{ current_project.folder_name }}/auto または manual フォルダに配置してください。
+                            </small> -->
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- リスト表示 -->
+                <div class="list-group d-none" id="images-list">
+                    {% for image in images %}
+                    <div class="list-group-item image-item" data-filename="{{ image.filename }}" data-width="{{ image.width }}" data-height="{{ image.height }}" data-annotated="{{ image.is_annotated|yesno:'true,false' }}">
+                        <div class="row align-items-center">
+                            <div class="col-md-2">
+                                <!-- <img src="/{{ current_project.folder_name }}/{% if use_cropped %}cropped{% else %}data_collection{% endif %}/{{ image.filename }}" class="img-thumbnail" style="height: 80px; width: 80px; object-fit: cover;" alt="{{ image.filename }}"> -->
+                                <img src="{% url 'annotator:get_thumbnail' image.id cropped %}" class="img-thumbnail" style="height: 80px; width: 80px; object-fit: cover;" alt="{{ image.filename }}">
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="mb-1">{{ image.filename }}</h6>
+                                <p class="mb-1">
+                                    <small class="text-muted">サイズ: {{ image.width }}x{{ image.height }}</small>
+                                </p>
+                            </div>
+                            <div class="col-md-2">
+                                {% if image.is_annotated %}
+                                    <span class="badge bg-success">完了</span>
+                                {% else %}
+                                    <span class="badge bg-danger">未完了</span>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-2">
+                                <a href="{% url 'annotator:annotate' image.id cropped %}" class="btn btn-primary btn-sm">アノテーション</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="list-group-item">
+                        <div class="alert alert-info mb-0">
+                            <h6>画像がありません</h6>
+                            <p class="mb-2">現在選択中のプロジェクト「{{ current_project.name }}」に画像がありません。</p>
+                            <p class="mb-0">
+                                <a href="{% url 'configuration:project_manager' %}" class="btn btn-outline-primary btn-sm">プロジェクト選択画面</a>で「画像読み込み」ボタンをクリックしてください。
+                            </p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>ラベル一覧</h3>
+                    <button class="btn btn-success btn-sm" id="add-label-btn">
+                        <i class="bi bi-plus"></i> ラベル追加
+                    </button>
+                </div>
+                <div id="labels-list">
+                    {% for label in labels %}
+                    <div class="label-item d-flex align-items-center mb-2 p-2 border rounded" data-label-id="{{ label.id }}">
+                        <span class="color-indicator rounded-circle me-2" 
+                              style="width: 16px; height: 16px; border: 1px solid rgba(0,0,0,0.1);"
+                              data-color="{{ label.color }}"></span>
+                        <span class="flex-grow-1">{{ label.name }}</span>
+                        <span class="text-muted me-2" style="font-size: 0.85em; opacity: 0.7;">
+                            ({{ label.usage_count|default:0 }})
+                        </span>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary btn-sm edit-label-btn" 
+                                    data-label-id="{{ label.id }}"
+                                    data-label-name="{{ label.name }}"
+                                    data-label-color="{{ label.color }}"
+                                    title="編集">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm delete-label-btn" 
+                                    data-label-id="{{ label.id }}"
+                                    data-label-name="{{ label.name }}"
+                                    title="削除">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted" id="no-labels-message">ラベルがありません。「ラベル追加」ボタンをクリックして追加してください。</p>
+                    {% endfor %}
+                </div>
+                
+                <h4 class="mt-4">統計</h4>
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        総画像数
+                        <span class="badge bg-primary rounded-pill">{{ images.count }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        アノテーション済み
+                        <span class="badge bg-success rounded-pill">{{ annotated_count|default:0 }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        {% else %}
+        <!-- プロジェクトが選択されていない場合の表示 -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="text-center py-5">
+                    <i class="bi bi-folder-plus display-1 text-muted"></i>
+                    <h3 class="mt-3">プロジェクトを選択してください</h3>
+                    <p class="text-muted">アノテーション作業を開始するには、まずプロジェクトを選択してください。</p>
+                    <a href="{% url 'configuration:project_manager' %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-folder"></i> プロジェクトを選択
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- モーダル：データセット分割 -->
+    <div class="modal fade" id="splitModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">データセット分割</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="split-form">
+                        <div class="mb-3">
+                            <label for="split-ratio" class="form-label">Train/Valid分割比率</label>
+                            <select class="form-select" id="split-ratio">
+                                <option value="0.7">7:3</option>
+                                <option value="0.8" selected>8:2</option>
+                                <option value="0.9">9:1</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="image-size" class="form-label">出力画像サイズ</label>
+                            <select class="form-select" id="image-size">
+                                <option value="640" selected>640×640</option>
+                                <option value="1280">1280×1280</option>
+                            </select>
+                            <div class="form-text">
+                                画像は正方形になるようにパディングされます。縦長の場合は右側に、横長の場合は下側にパディングが追加されます。
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" id="confirm-split">分割実行</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ラベル追加/編集モーダル -->
+    <div class="modal fade" id="labelModal" tabindex="-1" aria-labelledby="labelModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="labelModalLabel">ラベルを追加</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="labelForm">
+                        <div class="mb-3">
+                            <label for="labelName" class="form-label">ラベル名</label>
+                            <input type="text" class="form-control" id="labelName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="labelColor" class="form-label">色</label>
+                            <input type="color" class="form-control form-control-color" id="labelColor" value="#FF0000">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" id="saveLabelBtn">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/main.js' %}"></script>
+    <script>
+        // ラベルの色を動的に設定
+        document.addEventListener('DOMContentLoaded', function() {
+            const colorIndicators = document.querySelectorAll('.color-indicator[data-color]');
+            colorIndicators.forEach(indicator => {
+                const color = indicator.getAttribute('data-color');
+                if (color) {
+                    indicator.style.backgroundColor = color;
+                }
+            });
+            
+            // 表示切り替えボタンの初期状態を設定
+            const currentView = localStorage.getItem('imageViewMode') || 'grid';
+            const gridViewBtn = document.getElementById('grid-view-btn');
+            const listViewBtn = document.getElementById('list-view-btn');
+            
+            if (currentView === 'list') {
+                listViewBtn.classList.add('active');
+                gridViewBtn.classList.remove('active');
+            } else {
+                gridViewBtn.classList.add('active');
+                listViewBtn.classList.remove('active');
+            }
+        });
+        const infoToSplitDataset = {
+            projectname: "{{ current_project.name }}",
+            cropped: "{{ cropped }}", // 画像の切り抜き状態を取得
+            currentProject: "{{ current_project }}"
+        };    
+    </script>
+</body>
+</html>

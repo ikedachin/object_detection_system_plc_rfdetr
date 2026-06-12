@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>データ収集 - RF-DETR アノテーター</title>
+    {% load static %}
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.css' %}">
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet"> -->
+    <link rel="stylesheet" type="text/css" href="{% static 'get_imgs.css' %}">
+    <style>
+        /* データ収集設定 入力枠の強調 */
+        .card-body .form-control,
+        .card-body .form-select {
+            background-color: #FFF9D6;
+            border: 2px solid #E0C97A;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(224, 201, 122, 0.10);
+            font-weight: 600;
+            color: #7A5B00;
+            transition: box-shadow 0.2s, border-color 0.2s;
+        }
+
+        .card-body .form-control:focus,
+        .card-body .form-select:focus {
+            border-color: #D4B94A;
+            box-shadow: 0 0 0 0.2rem rgba(224, 201, 122, 0.25);
+            background-color: #FFF6C1;
+            color: #7A5B00;
+        }
+        body {
+            background: #FFFBEA;
+        }
+        /* カスタムスタイル */
+        .hero-section {
+            background: linear-gradient(135deg, #FFF9D6 0%, #FFE9A7 100%);
+            color: #7A5B00;
+            padding: 1rem 0;
+            margin-bottom: 1rem;
+        }
+
+        .canvas-container {
+            background: #FFFDEB;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 10px rgba(180, 160, 80, 0.10);
+            border: 1.5px solid #E0C97A;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            height: auto;
+        }
+
+        .canvas-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(180, 160, 80, 0.18);
+            border-color: #D4B94A;
+        }
+
+        .canvas-label {
+            font-weight: 600;
+            color: #A67C00;
+            margin-bottom: 0.5rem;
+            display: block;
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        #movie, #still {
+            max-width: 100%;
+            max-height: 600px;
+            width: auto;
+            height: auto;
+            border: 2px solid #E0C97A;
+            background-color: #FFFAF0;
+            /* aspect-ratio: 16/9;  // 必要なら指定 */
+            /* object-fit: contain; // 画像要素の場合 */
+        }
+
+        #still {
+            width: auto;
+            height: auto;
+            max-height: 400px;
+        }
+
+        #movie:hover, #still:hover {
+            border-color: #D4B94A;
+            box-shadow: 0 0 15px rgba(212, 185, 74, 0.18);
+        }
+
+        /* フルスクリーンモーダル */
+        .fullscreen-modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            cursor: pointer;
+        }
+
+        .fullscreen-modal canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 95%;
+            max-height: 95%;
+            border: 2px solid #fff;
+            border-radius: 8px;
+            /* 画質向上のための設定 */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+
+        .close-fullscreen {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10000;
+        }
+
+        .close-fullscreen:hover {
+            color: #ccc;
+        }
+
+        .btn-capture {
+            background: linear-gradient(135deg, #ff7b00 0%, #ff9500 100%);
+            border: none;
+            color: white;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(255, 123, 0, 0.3);
+        }
+
+        .btn-capture:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 123, 0, 0.4);
+            color: white;
+        }
+
+        .btn-capture:active {
+            transform: translateY(0);
+        }
+
+        .mini-clock {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin-left: 1rem;
+        }
+
+        .navbar-brand {
+            font-weight: 600;
+        }
+
+        .control-section {
+            background: #FFF9D6;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .back-link {
+            text-decoration: none;
+            color: #6c757d;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .back-link:hover {
+            color: #495057;
+            transform: translateX(-3px);
+        }
+
+        /* ヒーローセクションのボタンスタイル */
+        .hero-section .btn {
+            font-weight: 500;
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .hero-section .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .canvas-info {
+            text-align: center;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        /* 設定表示エリアのスタイル */
+        #settingsDisplayArea {
+            background-color: #FFFDEB;
+            border: 1.5px solid #E0C97A;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        #settingsDisplayArea .col div {
+            background-color: white;
+            border-radius: 6px;
+            padding: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        #settingsDisplayArea b {
+            color: #495057;
+            font-size: 0.9rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        #settingsDisplayArea div[id^="display"] {
+            color: #A67C00;
+            font-weight: 600;
+            font-size: 1rem;
+            min-height: 1.5rem;
+            padding: 0.25rem;
+            background-color: #FFF9D6;
+            border-radius: 4px;
+            border: 1px solid #E0C97A;
+        }
+
+        /* レスポンシブ対応 */
+        @media (max-width: 768px) {
+            #movie {
+                height: auto;
+            }
+            
+            #still {
+                max-height: 300px;
+            }
+            
+            .hero-section {
+                padding: 0.5rem 0;
+            }
+            
+            .hero-section .col-md-4 {
+                text-align: center !important;
+                margin-top: 1rem;
+            }
+            
+            .hero-section .btn {
+                margin: 0.25rem;
+                display: inline-block;
+            }
+            
+            .btn-capture {
+                padding: 12px 30px;
+                font-size: 1.1rem;
+            }
+        }
+
+        /* プロジェクト選択機能 */
+        #existingProjectList:focus {
+            border-color: var(--bs-primary);
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+
+        #projectInfo {
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <!-- ナビゲーションバー -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container d-flex align-items-center justify-content-between">
+            <a class="navbar-brand" href="/">
+                <strong>データ収集</strong>
+            </a>
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                <a class="nav-link text-white px-3" href="{% url 'configuration:configuration' %}">
+                    <i class="bi bi-gear"></i> 設定ページに戻る
+                </a>
+                <a class="nav-link text-white px-3" href="{% url 'configuration:workflow_manager' %}">
+                    <i class="bi bi-diagram-3"></i> ワークフロー管理に戻る
+                </a>
+                <!--
+                <a class="nav-link text-white px-3" href="/get_imgs/configuration/">
+                    <i class="bi bi-sliders"></i> データ収集設定
+                </a>
+                -->
+                <span class="navbar-text mini-clock ms-3" id="miniClock"></span>
+            </div>
+        </div>
+    </nav>
+    <!-- メインコンテンツ -->
+    <div class="container">
+        <!-- デバッグ情報パネル -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="alert alert-info" style="background-color: #e3f2fd; border: 1px solid #81c784; border-radius: 8px; margin-top: 1vh;">
+                    <h6><i class="bi bi-info-circle me-2"></i>カメラ接続状況</h6>
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <strong>設定反映状態</strong><br>
+                            <span id="debugCameraSettingApplied" class="badge bg-secondary">未設定</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>受信フレーム数</strong><br>
+                            <span id="debugFrameCount" class="badge bg-secondary">0</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>最終受信時刻</strong><br>
+                            <span id="debugLastFrameTime" class="badge bg-secondary">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-12">
+                <div class="row g-4 fade-in-up">
+                    <!-- リアルタイム表示 -->
+                    <div class="col-md-8">
+                        <div class="canvas-container">
+                            <label for="movie" class="canvas-label">
+                                <i class="bi bi-camera-video text-success me-2"></i>
+                                リアルタイム映像
+                            </label>
+                            <canvas id="movie"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 撮影画像表示 -->
+                    <div class="col-md-4">
+                        <div class="canvas-container">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="still" class="canvas-label mb-0 flex-grow-1">
+                                    <i class="bi bi-image text-info me-2"></i>
+                                    撮影画像
+                                </label>
+                                <div class="ms-4">
+                                    <button class="btn btn-capture btn-sm" id="snapButton">
+                                        <i class="bi bi-camera me-2"></i>撮影
+                                    </button>
+                                </div>
+                            </div>
+                            <canvas id="still"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 設定セクション -->
+                <div class="card shadow-sm mb-4 fade-in-up" style="animation-delay: 0.1s;">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3 text-primary"><i class="bi bi-gear me-2"></i>データ収集設定</h6>
+                        <form id="cameraSettingsForm">
+                            <div id="settingsInputArea">
+                                <!-- シンプルな設定項目 -->
+                                <div class="row justify-content-center mb-4">
+                                    <div class="col-md-10">
+                                        <div class="row g-3">
+                                            <!-- プロジェクト名 -->
+                                            <div class="col-md-6">
+                                                <label for="projectName" class="form-label fw-semibold">
+                                                    <i class="bi bi-folder me-1"></i>プロジェクト名
+                                                </label>
+                                                <input type="text" class="form-control" id="projectName" name="projectName" placeholder="自動生成されます">
+                                                <div class="form-text">日付と時刻で自動生成</div>
+                                            </div>
+                                            
+                                            <!-- 既存プロジェクト選択 -->
+                                            <div class="col-md-6">
+                                                <label for="existingProjectList" class="form-label fw-semibold">
+                                                    <i class="bi bi-folder2-open me-1"></i>既存プロジェクト
+                                                </label>
+                                                <select class="form-select" id="existingProjectList" name="existingProjectList">
+                                                    <option value="">新規作成または既存を選択...</option>
+                                                </select>
+                                                <div class="form-text">
+                                                    <span id="projectInfo" class="text-muted"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 基本設定 -->
+                                <div class="row justify-content-center">
+                                    <div class="col-md-10">
+                                        <div class="row g-3 text-center">
+                                            <div class="col-md-4">
+                                                <label for="imageSize" class="form-label fw-semibold">
+                                                    <i class="bi bi-aspect-ratio me-1"></i>画像サイズ
+                                                </label>
+                                                <select class="form-select" id="imageSize" name="imageSize">
+                                                    <option value="HD1080p">フルHD (1920x1080)</option>
+                                                    <option value="HD720p">高画質 (1280x720)</option>
+                                                    <option value="SD480p" selected>標準 (640x480)</option>
+                                                    <option value="SD360p">低画質 (480x360)</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label for="interval" class="form-label fw-semibold">
+                                                    <i class="bi bi-clock me-1"></i>撮影間隔（秒）
+                                                </label>
+                                                <input type="number" class="form-control" id="interval" name="interval" min="1" max="600" step="1" value="300">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label for="fps" class="form-label fw-semibold">
+                                                    <i class="bi bi-speedometer me-1"></i>FPS
+                                                </label>
+                                                <input type="number" class="form-control" id="fps" name="fps" min="1" max="30" step="1" value="1">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="text-center mt-4">
+                                    <button type="button" class="btn btn-primary px-5" id="applySettingsBtn">
+                                        <i class="bi bi-play-circle me-2"></i>開始
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="settingsDisplayArea" style="display:none;">
+                                <div class="alert alert-success text-center mb-3">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    <strong id="displayProjectName"></strong> で撮影開始中
+                                </div>
+                                <div class="row text-center">
+                                    <div class="col-md-3">
+                                        <small class="text-muted">画像サイズ</small><br>
+                                        <span id="displayImageSize" class="fw-bold text-primary">-</span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <small class="text-muted">撮影間隔</small><br>
+                                        <span id="displayInterval" class="fw-bold text-primary">-</span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <small class="text-muted">FPS</small><br>
+                                        <span id="displayFps" class="fw-bold text-primary">-</span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button type="button" class="btn btn-secondary btn-sm" id="editSettingsBtn">
+                                            <i class="bi bi-gear me-1"></i>変更
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 共通案内 -->
+                <div class="text-center mt-3 fade-in-up" style="animation-delay: 0.2s;">
+                    <div class="canvas-info">
+                        <i class="bi bi-arrows-fullscreen me-1"></i>
+                        ダブルクリックで拡大表示
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- フルスクリーンモーダル -->
+    <div id="fullscreenModal" class="fullscreen-modal">
+        <span class="close-fullscreen">&times;</span>
+        <canvas id="fullscreenCanvas"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript" src="{% static 'get_imgs.js' %}"></script>
+    <script>
+        // --- 追加: movieキャンバスの縦横比を元画像に合わせて調整 ---
+        // 例: get_imgs.jsでvideo要素や画像からmovieCanvasへ描画している場合
+        // ここでcanvasサイズを元画像の縦横比に合わせて都度調整する
+        // 例としてwindowにグローバル関数を用意
+        window.setMovieCanvasSize = function(imgOrVideo) {
+            const movieCanvas = document.getElementById('movie');
+            if (!imgOrVideo || !movieCanvas) return;
+            let w = imgOrVideo.videoWidth || imgOrVideo.naturalWidth || imgOrVideo.width;
+            let h = imgOrVideo.videoHeight || imgOrVideo.naturalHeight || imgOrVideo.height;
+            if (w && h) {
+                // 最大幅・高さを超えないようにスケーリング
+                const maxW = movieCanvas.parentElement.offsetWidth;
+                const maxH = 600; // CSSのmax-heightと合わせる
+                let scale = Math.min(maxW / w, maxH / h, 1);
+                movieCanvas.width = Math.round(w);
+                movieCanvas.height = Math.round(h);
+                movieCanvas.style.width = Math.round(w * scale) + 'px';
+                movieCanvas.style.height = Math.round(h * scale) + 'px';
+            }
+        }
+        // get_imgs.js側で画像/動画を描画する直前にwindow.setMovieCanvasSize(video)を呼び出してください
+
+        // フルスクリーン表示用のグローバル関数を追加
+        window.updateFullscreenFPS = function(fps) {
+            // get_imgs.js から呼び出されて、フルスクリーン更新間隔を調整する関数
+            console.log('外部からのFPS更新要求:', fps);
+            
+            // DOMContentLoaded内で定義される変数にアクセスするため、グローバルに参照を保存
+            if (window.fullscreenData && window.fullscreenData.updateInterval && fps > 0) {
+                window.fullscreenData.currentFPS = fps;
+                
+                if (window.fullscreenData.updateInterval) {
+                    clearInterval(window.fullscreenData.updateInterval);
+                    const interval = Math.max(50, Math.min(1000, 1000 / fps)); // 最小50ms（20FPS上限）、最大1000ms（1FPS下限）
+                    
+                    window.fullscreenData.updateInterval = setInterval(function() {
+                        const movieCanvas = document.getElementById('movie');
+                        const fullscreenCanvas = document.getElementById('fullscreenCanvas');
+                        const fullscreenModal = document.getElementById('fullscreenModal');
+                        if (movieCanvas && fullscreenCanvas && fullscreenModal && fullscreenModal.style.display === 'block') {
+                            const ctx = fullscreenCanvas.getContext('2d');
+                            if (movieCanvas.width > 0 && movieCanvas.height > 0) {
+                                if (fullscreenCanvas.width !== movieCanvas.width || 
+                                    fullscreenCanvas.height !== movieCanvas.height) {
+                                    fullscreenCanvas.width = movieCanvas.width;
+                                    fullscreenCanvas.height = movieCanvas.height;
+                                }
+                                ctx.drawImage(movieCanvas, 0, 0);
+                            }
+                        }
+                    }, interval);
+                    console.log('外部からフルスクリーン更新間隔を調整:', interval + 'ms');
+                }
+            }
+        }
+
+        // 全ての機能を1つのDOMContentLoadedで管理
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOMContentLoaded: 設定機能の初期化開始');
+            
+            // グローバルアクセス用のデータオブジェクト
+            window.fullscreenData = {
+                updateInterval: null,
+                currentFPS: 1
+            };
+            
+            // フルスクリーン機能の初期化
+            const movieCanvas = document.getElementById('movie');
+            const stillCanvas = document.getElementById('still');
+            const fullscreenModal = document.getElementById('fullscreenModal');
+            const fullscreenCanvas = document.getElementById('fullscreenCanvas');
+            const closeBtn = document.querySelector('.close-fullscreen');
+            
+            let fullscreenUpdateInterval = null; // フルスクリーン更新用のインターバル
+            let currentFPS = 1; // 現在のFPS設定を保持
+
+            function showFullscreen(sourceCanvas) {
+                console.log('フルスクリーン表示開始:', sourceCanvas.id);
+                
+                // キャンバスサイズを設定
+                fullscreenCanvas.width = sourceCanvas.width;
+                fullscreenCanvas.height = sourceCanvas.height;
+                
+                // 初回描画
+                const ctx = fullscreenCanvas.getContext('2d');
+                ctx.drawImage(sourceCanvas, 0, 0);
+                
+                // モーダルを表示
+                fullscreenModal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                
+                // リアルタイム映像の場合は継続的に更新
+                if (sourceCanvas.id === 'movie') {
+                    console.log('リアルタイム映像のフルスクリーン更新を開始');
+                    
+                    // 現在のFPS設定を取得
+                    const fpsInput = document.getElementById('fps');
+                    if (fpsInput && fpsInput.value) {
+                        currentFPS = parseInt(fpsInput.value);
+                    }
+                    
+                    // FPSに基づいて更新間隔を計算（最小50ms、最大1000ms）
+                    const interval = Math.max(50, Math.min(1000, 1000 / currentFPS));
+                    console.log('フルスクリーン更新間隔:', interval + 'ms', '(FPS:', currentFPS + ')');
+                    
+                    fullscreenUpdateInterval = setInterval(function() {
+                        // ソースキャンバスが更新されている場合のみ描画
+                        if (sourceCanvas.width > 0 && sourceCanvas.height > 0) {
+                            // サイズが変わった場合は調整
+                            if (fullscreenCanvas.width !== sourceCanvas.width || 
+                                fullscreenCanvas.height !== sourceCanvas.height) {
+                                fullscreenCanvas.width = sourceCanvas.width;
+                                fullscreenCanvas.height = sourceCanvas.height;
+                            }
+                            ctx.drawImage(sourceCanvas, 0, 0);
+                        }
+                    }, interval);
+                    
+                    // グローバル参照も更新
+                    if (window.fullscreenData) {
+                        window.fullscreenData.updateInterval = fullscreenUpdateInterval;
+                        window.fullscreenData.currentFPS = currentFPS;
+                    }
+                }
+            }
+
+            function hideFullscreen() {
+                console.log('フルスクリーン表示終了');
+                fullscreenModal.style.display = 'none';
+                document.body.style.overflow = 'auto';
+                
+                // 更新インターバルをクリア
+                if (fullscreenUpdateInterval) {
+                    clearInterval(fullscreenUpdateInterval);
+                    fullscreenUpdateInterval = null;
+                    console.log('フルスクリーン更新を停止');
+                }
+                
+                // グローバル参照もクリア
+                if (window.fullscreenData) {
+                    if (window.fullscreenData.updateInterval) {
+                        clearInterval(window.fullscreenData.updateInterval);
+                        window.fullscreenData.updateInterval = null;
+                    }
+                }
+            }
+
+            // ダブルクリックイベント
+            movieCanvas.addEventListener('dblclick', function() {
+                showFullscreen(movieCanvas);
+            });
+
+            stillCanvas.addEventListener('dblclick', function() {
+                showFullscreen(stillCanvas);
+            });
+
+            // モーダルを閉じる
+            closeBtn.addEventListener('click', hideFullscreen);
+            fullscreenModal.addEventListener('click', function(e) {
+                if (e.target === fullscreenModal) {
+                    hideFullscreen();
+                }
+            });
+
+            // ESCキーで閉じる
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && fullscreenModal.style.display === 'block') {
+                    hideFullscreen();
+                }
+            });
+
+            // プロジェクト名を日付＋時刻で自動生成（初期値のみ）
+            const projectNameInput = document.getElementById('projectName');
+            if (projectNameInput && !projectNameInput.value) {
+                const now = new Date();
+                const pad = n => n.toString().padStart(2, '0');
+                const projectName = `project_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+                projectNameInput.value = projectName;
+                console.log('プロジェクト名を自動生成:', projectName);
+            }
+
+            // プロジェクト選択機能のイベントリスナー
+            const existingProjectList = document.getElementById('existingProjectList');
+
+            // プロジェクト管理関数をローカルで定義
+            let availableProjects = [];
+
+            function loadAvailableProjects() {
+                console.log('プロジェクト一覧を読み込み中...');
+                fetch('/get_imgs/api/get_project_stats', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => {
+                    console.log('プロジェクト一覧取得レスポンス:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('プロジェクト一覧データ:', data);
+                    if (data.success) {
+                        availableProjects = data.projects;
+                        console.log('取得したプロジェクト数:', availableProjects.length);
+                        populateProjectSelect();
+                    } else {
+                        console.error('プロジェクト一覧の取得に失敗:', data.error);
+                        alert('プロジェクト一覧の取得に失敗しました: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('プロジェクト一覧の取得中にエラーが発生:', error);
+                    alert('プロジェクト一覧の取得中にエラーが発生しました: ' + error.message);
+                });
+            }
+
+            function populateProjectSelect() {
+                const existingProjectList = document.getElementById('existingProjectList');
+                if (!existingProjectList) {
+                    console.error('existingProjectList要素が見つかりません');
+                    return;
+                }
+                
+                console.log('プロジェクトリストを作成中、プロジェクト数:', availableProjects.length);
+                
+                // オプションをクリア
+                existingProjectList.innerHTML = '<option value="">新規作成または既存を選択...</option>';
+                
+                // プロジェクトをリストに追加（作成日時の新しい順）
+                availableProjects
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = project.name;
+                        option.dataset.folderName = project.folder_name;
+                        option.dataset.totalImages = project.total_image_count;
+                        option.dataset.createdAt = project.created_at;
+                        option.dataset.isActive = project.is_active;
+                        existingProjectList.appendChild(option);
+                        console.log('プロジェクトを追加:', project.name);
+                    });
+                
+                console.log('プロジェクトリスト作成完了');
+            }
+
+            function clearProjectInfo() {
+                const projectInfo = document.getElementById('projectInfo');
+                if (projectInfo) {
+                    projectInfo.textContent = '';
+                }
+            }
+
+            function onExistingProjectSelect() {
+                const existingProjectList = document.getElementById('existingProjectList');
+                const projectInfo = document.getElementById('projectInfo');
+                const projectNameInput = document.getElementById('projectName');
+                
+                if (!existingProjectList.value) {
+                    clearProjectInfo();
+                    // 新規プロジェクトモードに戻す
+                    if (projectNameInput) {
+                        projectNameInput.style.display = 'block';
+                    }
+                    return;
+                }
+                
+                // 既存プロジェクトが選択された場合
+                const selectedOption = existingProjectList.options[existingProjectList.selectedIndex];
+                const totalImages = selectedOption.dataset.totalImages;
+                const createdAt = new Date(selectedOption.dataset.createdAt).toLocaleDateString('ja-JP');
+                const isActive = selectedOption.dataset.isActive === 'true';
+                
+                if (projectInfo) {
+                    projectInfo.innerHTML = `
+                        <i class="bi bi-images me-1"></i>画像数: ${totalImages}枚 | 
+                        <i class="bi bi-calendar me-1"></i>作成日: ${createdAt}
+                        ${isActive ? '<span class="badge bg-success ms-2">アクティブ</span>' : ''}
+                    `;
+                }
+                
+                // 既存プロジェクトが選択されたら新規プロジェクト名入力を非表示
+                if (projectNameInput) {
+                    projectNameInput.style.display = 'none';
+                }
+            }
+
+            // グローバル関数として定義（他の場所から呼び出されるため）
+            window.getCurrentProjectName = function() {
+                const existingProjectList = document.getElementById('existingProjectList');
+                
+                if (existingProjectList && existingProjectList.value) {
+                    // 既存プロジェクトが選択されている場合
+                    const selectedOption = existingProjectList.options[existingProjectList.selectedIndex];
+                    return selectedOption?.textContent || '';
+                } else {
+                    // 新規プロジェクトの場合
+                    return document.getElementById('projectName')?.value || '';
+                }
+            };
+
+            window.isExistingProject = function() {
+                const existingProjectList = document.getElementById('existingProjectList');
+                return existingProjectList && existingProjectList.value !== '';
+            };
+
+            window.getSelectedProjectFolderName = function() {
+                if (!window.isExistingProject()) return null;
+                
+                const existingProjectList = document.getElementById('existingProjectList');
+                const selectedOption = existingProjectList?.options[existingProjectList.selectedIndex];
+                return selectedOption?.dataset.folderName || null;
+            };
+
+            if (existingProjectList) {
+                existingProjectList.addEventListener('change', onExistingProjectSelect);
+            }
+
+            // ページ読み込み時に既存プロジェクト一覧を取得
+            loadAvailableProjects();
+
+            // 設定適用ボタンのイベントリスナー
+            const applySettingsBtn = document.getElementById('applySettingsBtn');
+            const editSettingsBtn = document.getElementById('editSettingsBtn');
+            const settingsInputArea = document.getElementById('settingsInputArea');
+            const settingsDisplayArea = document.getElementById('settingsDisplayArea');
+
+            console.log('要素の取得確認:', {
+                applySettingsBtn: !!applySettingsBtn,
+                editSettingsBtn: !!editSettingsBtn,
+                settingsInputArea: !!settingsInputArea,
+                settingsDisplayArea: !!settingsDisplayArea
+            });
+
+            if (applySettingsBtn) {
+                applySettingsBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('🔧 設定適用ボタンがクリックされました');
+                    
+                    // まず、カメラの利用可能性をチェック
+                    fetch('/get_imgs/api/get_camera_availability', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(cameraData => {
+                        console.log('📷 カメラ利用可能性チェック結果:', cameraData);
+                        
+                        if (!cameraData.success || cameraData.camera_count === 0) {
+                            alert('❌ カメラが利用できません: ' + (cameraData.message || 'カメラが見つかりません'));
+                            return;
+                        }
+                        
+                        console.log('✅ カメラ利用可能:', cameraData.available_cameras);
+                        
+                        // プロジェクト名を取得（新規または既存）
+                        const projectName = getCurrentProjectName();
+                        const imageSize = document.getElementById('imageSize').value;
+                        const interval = document.getElementById('interval').value;
+                        const fps = document.getElementById('fps').value;
+
+                        console.log('📋 取得した設定値:', { projectName, imageSize, interval, fps });
+
+                        if (!projectName) {
+                            alert('❌ プロジェクトを選択してください');
+                            return;
+                        }
+
+                        // 既存プロジェクトか新規プロジェクトかで処理を分岐
+                        if (isExistingProject()) {
+                            // 既存プロジェクトの場合：フォルダ作成は不要、直接設定反映
+                            console.log('📁 既存プロジェクトを使用:', projectName);
+                            return Promise.resolve({
+                                success: true,
+                                project_name: projectName,
+                                folder_name: getSelectedProjectFolderName()
+                            });
+                        } else {
+                            // 新規プロジェクトの場合：フォルダを作成
+                            console.log('📁 新規プロジェクトフォルダを作成:', projectName);
+                            return fetch('/get_imgs/api/create_project_folders', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ project_name: projectName })
+                            }).then(response => response.json());
+                        }
+                    })
+                    .then(folderData => {
+                        console.log('📁 プロジェクト処理結果:', folderData);
+                        
+                        if (!folderData.success) {
+                            alert('❌ プロジェクト処理エラー: ' + (folderData.error || '不明なエラー'));
+                            return;
+                        }
+                        
+                        // 設定値を再取得
+                        const currentProjectName = getCurrentProjectName();
+                        const imageSize = document.getElementById('imageSize').value;
+                        const interval = document.getElementById('interval').value;
+                        const fps = document.getElementById('fps').value;
+                        
+                        // 表示エリアに値を設定
+                        const displayProjectName = document.getElementById('displayProjectName');
+                        const displayImageSize = document.getElementById('displayImageSize');
+                        const displayInterval = document.getElementById('displayInterval');
+                        const displayFps = document.getElementById('displayFps');
+
+                        if (displayProjectName) displayProjectName.textContent = currentProjectName;
+                        if (displayImageSize) displayImageSize.textContent = imageSize;
+                        if (displayInterval) displayInterval.textContent = interval + '秒';
+                        if (displayFps) displayFps.textContent = fps + ' FPS';
+
+                        console.log('✅ UI表示更新完了:', { projectName: currentProjectName, imageSize, interval: interval + '秒', fps: fps + ' FPS' });
+
+                        // 入力エリアを非表示、表示エリアを表示
+                        if (settingsInputArea) settingsInputArea.style.display = 'none';
+                        if (settingsDisplayArea) settingsDisplayArea.style.display = 'block';
+
+                        // 設定反映済みフラグON
+                        window.isCameraSettingApplied = true;
+                        console.log('✅ 設定反映フラグON');
+                        // window.updateDebugInfo(); // デバッグ情報更新
+
+                        // 画像サイズを反映
+                        const size = window.getSelectedImageSize();
+                        const movieCanvas = document.getElementById('movie');
+                        const stillCanvas = document.getElementById('still');
+                        
+                        if (movieCanvas) {
+                            movieCanvas.width = size.w;
+                            movieCanvas.height = size.h;
+                        }
+                        if (stillCanvas) {
+                            stillCanvas.width = size.w;
+                            stillCanvas.height = size.h;
+                        }
+
+                        // カメラWebSocket接続
+                        console.log('📡 設定反映完了、カメラWebSocket開始中...');
+                        window.initCameraWebSocket();
+                        
+                    })
+                    .catch(error => {
+                        console.error('❌ 設定反映エラー:', error);
+                        alert('設定反映でエラーが発生しました: ' + error.message);
+                    });
+
+                    // フルスクリーン表示中の場合は、FPS設定を即座に反映
+                    if (fullscreenModal.style.display === 'block' && fullscreenUpdateInterval) {
+                        console.log('フルスクリーン表示中のFPS設定を更新します');
+                        currentFPS = parseInt(fps);
+                        
+                        // 既存のインターバルをクリア
+                        clearInterval(fullscreenUpdateInterval);
+                        
+                        // 新しいFPSで再開
+                        const interval = Math.max(50, Math.min(1000, 1000 / currentFPS));
+                        console.log('新しいフルスクリーン更新間隔:', interval + 'ms', '(FPS:', currentFPS + ')');
+                        
+                        fullscreenUpdateInterval = setInterval(function() {
+                            const movieCanvas = document.getElementById('movie');
+                            const fullscreenCanvas = document.getElementById('fullscreenCanvas');
+                            if (movieCanvas && fullscreenCanvas) {
+                                const ctx = fullscreenCanvas.getContext('2d');
+                                if (movieCanvas.width > 0 && movieCanvas.height > 0) {
+                                    if (fullscreenCanvas.width !== movieCanvas.width || 
+                                        fullscreenCanvas.height !== movieCanvas.height) {
+                                        fullscreenCanvas.width = movieCanvas.width;
+                                        fullscreenCanvas.height = movieCanvas.height;
+                                    }
+                                    ctx.drawImage(movieCanvas, 0, 0);
+                                }
+                            }
+                        }, interval);
+                    } else {
+                        // フルスクリーン表示していない場合も現在のFPS設定を更新
+                        currentFPS = parseInt(fps);
+                        console.log('FPS設定を更新:', currentFPS);
+                    }
+
+                    // 設定をget_imgs.jsに送信
+                    if (window.applySettings) {
+                        console.log('window.applySettingsを呼び出します');
+                        window.applySettings({
+                            projectName: getCurrentProjectName(),
+                            imageSize: imageSize,
+                            interval: parseInt(interval),
+                            fps: parseInt(fps)
+                        });
+                    } else {
+                        console.error('window.applySettings関数が見つかりません');
+                    }
+                });
+            }
+
+            if (editSettingsBtn) {
+                editSettingsBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('再設定ボタンがクリックされました');
+                    
+                    // 表示エリアを非表示、入力エリアを表示
+                    if (settingsDisplayArea) settingsDisplayArea.style.display = 'none';
+                    if (settingsInputArea) settingsInputArea.style.display = 'block';
+                    
+                    console.log('入力エリアに戻しました');
+                });
+            }
+
+            console.log('設定機能の初期化完了');
+        });
+    </script>
+</body>
+</html>

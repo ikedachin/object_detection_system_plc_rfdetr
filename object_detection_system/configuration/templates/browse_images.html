@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像フォルダ参照 - RF-DETR アノテーター</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet"> -->
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'configuration:configuration' %}">
+                <strong>RF-DETR アノテーター - 画像フォルダ参照</strong>
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link text-white" href="{% url 'configuration:configuration' %}">
+                    <i class="bi bi-house"></i> 設定ページに戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2 class="mb-4">画像フォルダの状況</h2>
+                <p class="text-muted mb-4">システムで利用される各画像フォルダの状況を確認できます。</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- 自動撮影フォルダ -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 {% if folder_info.snaps_auto.exists %}state-success{% else %}state-warning{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-camera-fill text-primary me-3" style="font-size: 2rem;"></i>
+                            <div>
+                                <h5 class="card-title mb-1">自動撮影画像</h5>
+                                <p class="card-text text-muted small">snaps/snaps_auto/</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 mb-1 {% if folder_info.snaps_auto.count > 0 %}text-success{% else %}text-muted{% endif %}">
+                                        {{ folder_info.snaps_auto.count }}
+                                    </div>
+                                    <small class="text-muted">画像数</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    {% if folder_info.snaps_auto.exists %}
+                                        <i class="bi bi-check-circle text-success h4"></i>
+                                        <br><small class="text-success">存在</small>
+                                    {% else %}
+                                        <i class="bi bi-x-circle text-warning h4"></i>
+                                        <br><small class="text-warning">未作成</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <p class="small text-muted mb-2">
+                            <strong>パス:</strong> {{ folder_info.snaps_auto.path }}
+                        </p>
+                        <p class="small text-muted">
+                            カメラで自動撮影された画像が保存されるフォルダです。
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 手動撮影フォルダ -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 {% if folder_info.snaps_manual.exists %}state-success{% else %}state-warning{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-camera text-secondary me-3" style="font-size: 2rem;"></i>
+                            <div>
+                                <h5 class="card-title mb-1">手動撮影画像</h5>
+                                <p class="card-text text-muted small">snaps/snaps_manual/</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 mb-1 {% if folder_info.snaps_manual.count > 0 %}text-success{% else %}text-muted{% endif %}">
+                                        {{ folder_info.snaps_manual.count }}
+                                    </div>
+                                    <small class="text-muted">画像数</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    {% if folder_info.snaps_manual.exists %}
+                                        <i class="bi bi-check-circle text-success h4"></i>
+                                        <br><small class="text-success">存在</small>
+                                    {% else %}
+                                        <i class="bi bi-x-circle text-warning h4"></i>
+                                        <br><small class="text-warning">未作成</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <p class="small text-muted mb-2">
+                            <strong>パス:</strong> {{ folder_info.snaps_manual.path }}
+                        </p>
+                        <p class="small text-muted">
+                            手動で撮影・保存された画像が保存されるフォルダです。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- ベース画像フォルダ -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 {% if folder_info.base_images.exists %}state-success{% else %}state-info{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-images text-info me-3" style="font-size: 2rem;"></i>
+                            <div>
+                                <h5 class="card-title mb-1">アノテーション対象画像</h5>
+                                <p class="card-text text-muted small">base_images/</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 mb-1 {% if folder_info.base_images.count > 0 %}text-success{% else %}text-muted{% endif %}">
+                                        {{ folder_info.base_images.count }}
+                                    </div>
+                                    <small class="text-muted">画像数</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    {% if folder_info.base_images.exists %}
+                                        <i class="bi bi-check-circle text-success h4"></i>
+                                        <br><small class="text-success">存在</small>
+                                    {% else %}
+                                        <i class="bi bi-info-circle text-info h4"></i>
+                                        <br><small class="text-info">未作成</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <p class="small text-muted mb-2">
+                            <strong>パス:</strong> {{ folder_info.base_images.path }}
+                        </p>
+                        <p class="small text-muted">
+                            アノテーションツールで読み込み対象となる画像フォルダです。
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 切り抜き済み画像フォルダ -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 {% if folder_info.cropped.exists %}state-success{% else %}state-info{% endif %}">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="bi bi-crop text-warning me-3" style="font-size: 2rem;"></i>
+                            <div>
+                                <h5 class="card-title mb-1">切り抜き済み画像</h5>
+                                <p class="card-text text-muted small">media/cropped/</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 mb-1 {% if folder_info.cropped.count > 0 %}text-success{% else %}text-muted{% endif %}">
+                                        {{ folder_info.cropped.count }}
+                                    </div>
+                                    <small class="text-muted">画像数</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    {% if folder_info.cropped.exists %}
+                                        <i class="bi bi-check-circle text-success h4"></i>
+                                        <br><small class="text-success">存在</small>
+                                    {% else %}
+                                        <i class="bi bi-info-circle text-info h4"></i>
+                                        <br><small class="text-info">未作成</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <p class="small text-muted mb-2">
+                            <strong>パス:</strong> {{ folder_info.cropped.path }}
+                        </p>
+                        <p class="small text-muted">
+                            切り抜きツールで処理された画像が保存されるフォルダです。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- アクション -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-lightning-fill me-2"></i>クイックアクション
+                        </h5>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <a href="{% url 'configuration:crop' %}" class="btn btn-primary w-100">
+                                    <i class="bi bi-crop me-2"></i>画像切り抜きツール
+                                </a>
+                            </div>
+                            <div class="col-md-4">
+                                <a href="/annotator/" class="btn btn-success w-100">
+                                    <i class="bi bi-tags me-2"></i>アノテーションツール
+                                </a>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-outline-info w-100" onclick="location.reload()">
+                                    <i class="bi bi-arrow-clockwise me-2"></i>情報を更新
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- フォルダ作成の説明 -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-info-circle me-2"></i>フォルダについて
+                    </h6>
+                    <p class="mb-2">
+                        各フォルダは自動的に作成される場合と、手動で作成する必要がある場合があります：
+                    </p>
+                    <ul class="mb-0">
+                        <li><strong>snaps/</strong> フォルダ群：カメラアプリケーションが自動作成</li>
+                        <li><strong>base_images/</strong> フォルダ：手動でフォルダを作成し、アノテーション対象画像を配置</li>
+                        <li><strong>media/cropped/</strong> フォルダ：切り抜きツール使用時に自動作成</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

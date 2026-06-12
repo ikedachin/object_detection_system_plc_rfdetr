@@ -1,0 +1,293 @@
+/* カスタムスタイル */
+.canvas-container {
+    text-align: center;
+    overflow: auto;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px;
+    position: relative; /* 追加: ホバー中のバウンディングボックスハイライト用 */
+}
+
+#annotation-canvas {
+    max-width: 100%;
+    max-height: 70vh;
+    display: block;
+    margin: 0 auto;
+    background-color: #ffffff;
+    border: 2px solid #dee2e6 !important;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.label-btn.active {
+    background-color: var(--bs-primary) !important;
+    color: white !important;
+    border-color: var(--bs-primary) !important;
+}
+
+.annotation-item {
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.annotation-item:hover {
+    background-color: #e9ecef;
+    border-color: #007bff;
+    box-shadow: 0 2px 4px rgba(0,123,255,0.2);
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+.annotation-item.highlighted {
+    border-color: #007bff;
+    background-color: #e7f3ff;
+}
+
+/* カードホバーエフェクト */
+.card {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0,0,0,0.125);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    border-color: rgba(0,123,255,0.25);
+}
+
+/* アイコンスタイル */
+.bi {
+    vertical-align: text-bottom;
+}
+
+/* ボタングループスタイル */
+.btn-group .btn {
+    transition: all 0.2s ease;
+}
+
+/* カスタムバッジ */
+.badge {
+    font-size: 0.75em;
+}
+
+/* ナビゲーションバーカスタム */
+.navbar-brand {
+    font-weight: 600;
+}
+
+/* フォームコントロール */
+.form-control:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* アラート */
+.alert {
+    border: none;
+    border-radius: 8px;
+}
+
+/* リストグループアイテム */
+.list-group-item {
+    border-color: rgba(0,0,0,0.125);
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* モーダル */
+.modal-content {
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+.modal-footer {
+    border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+/* テーブル */
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+}
+
+/* スクロールバーカスタム */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* レスポンシブ調整 */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .btn-group {
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        flex: 1;
+    }
+}
+
+/* 色相関のクラス */
+.text-primary-light {
+    color: #6f91d6 !important;
+}
+
+.bg-primary-light {
+    background-color: #e7f1ff !important;
+}
+
+.border-primary-light {
+    border-color: #b3d1ff !important;
+}
+
+/* ローディングアニメーション */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* カスタムボタンサイズ */
+.btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    border-radius: 0.2rem;
+}
+
+/* 画像プレビュー */
+.image-preview {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* ツールチップカスタム */
+.tooltip-inner {
+    background-color: #333;
+    color: #fff;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+}
+
+/* ユーティリティクラス */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.text-decoration-none {
+    text-decoration: none !important;
+}
+
+.shadow-sm {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+.shadow {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.shadow-lg {
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175) !important;
+}
+
+/* フェードイン効果 */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* プログレスバー */
+.progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    border-radius: 4px;
+}
+
+/* カードアニメーション */
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card-animate {
+    animation: cardSlideIn 0.6s ease-out;
+}
+
+/* 成功・エラー状態 */
+.state-success {
+    border-left: 4px solid #28a745;
+    background-color: #f8fff9;
+}
+
+.state-error {
+    border-left: 4px solid #dc3545;
+    background-color: #fff8f8;
+}
+
+.state-warning {
+    border-left: 4px solid #ffc107;
+    background-color: #fffdf5;
+}
+
+.state-info {
+    border-left: 4px solid #17a2b8;
+    background-color: #f7feff;
+}

@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像切り抜きアプリ</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'crop_app/style.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/cropperjs@1.5.12/dist/cropper.css" onerror="console.warn('Cropper.js フォールバックCSS読み込み失敗')">
+    <style>
+        /* 優しい赤系のカラーパレット */
+        :root {
+            --soft-red-bg: #fff5f5;
+            --soft-red: #f8d7da;
+            --soft-red-border: #f5c6cb;
+            --main-red: #e57373;
+            --main-red-dark: #d9534f;
+            --main-red-text: #263238; /* ダークグレー */
+            --main-muted-text: #495057; /* muted用 */
+            --main-accent-text: #1565c0; /* アクセント用ネイビー */
+            --card-shadow: 0 4px 8px rgba(233, 30, 99, 0.08);
+        }
+        body {
+            background: var(--soft-red-bg);
+        }
+        .navbar {
+            background: linear-gradient(90deg, #f8d7da 0%, #e57373 100%) !important;
+            border-bottom: 2px solid var(--soft-red-border);
+        }
+        .navbar .navbar-brand {
+            color: var(--main-accent-text) !important;
+        }
+        .navbar .nav-link {
+            color: var(--main-accent-text) !important;
+        }
+        .navbar .nav-link:hover {
+            color: #fff !important;
+            background: var(--main-red);
+            border-radius: 0.5rem;
+        }
+        .card {
+            border: 1.5px solid var(--soft-red-border);
+            background: #fff;
+            box-shadow: var(--card-shadow);
+        }
+        .card-header {
+            background: var(--soft-red);
+            color: var(--main-accent-text);
+            border-bottom: 1px solid var(--soft-red-border);
+        }
+        .card-footer {
+            background: var(--soft-red-bg);
+        }
+        .btn-primary, .btn-danger {
+            background: var(--main-red);
+            border-color: var(--main-red-dark);
+            color: #fff;
+        }
+        .btn-primary:hover, .btn-danger:hover {
+            background: var(--main-red-dark);
+            border-color: #b71c1c;
+        }
+        .btn-outline-danger, .btn-outline-secondary {
+            color: var(--main-red-dark);
+            border-color: var(--main-red-dark);
+            background: #fff;
+        }
+        .btn-outline-danger:hover, .btn-outline-secondary:hover {
+            background: var(--main-red);
+            color: #fff;
+        }
+        .alert-info {
+            background: #fff5f5;
+            color: var(--main-accent-text);
+            border-color: var(--soft-red-border);
+        }
+        .alert-danger {
+            background: #f8d7da;
+            color: var(--main-accent-text);
+            border-color: var(--main-red-dark);
+        }
+        .badge.bg-primary {
+            background: var(--main-red) !important;
+        }
+        .badge.bg-secondary {
+            background: var(--soft-red-border) !important;
+            color: var(--main-accent-text) !important;
+        }
+        .feature-icon, .bi {
+            color: var(--main-red-dark) !important;
+        }
+        .no-image {
+            background: var(--soft-red);
+            border: 2px dashed var(--main-red);
+            min-height: 320px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--main-red-dark);
+        }
+        .modal-content {
+            border: 2px solid var(--soft-red-border);
+        }
+        .modal-header, .modal-footer {
+            background: var(--soft-red);
+        }
+        .form-control:focus, .btn:focus {
+            box-shadow: 0 0 0 0.2rem #f8d7da55;
+        }
+        /* スクロールバーも優しい赤 */
+        ::-webkit-scrollbar-thumb {
+            background: var(--soft-red-border);
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--soft-red-bg);
+        }
+        /* ショートカット説明や小テキストも赤系 */
+        .small, .text-muted {
+            color: var(--main-muted-text) !important;
+        }
+        /* カスタム: 画像プレビュー枠 */
+        #preview-canvas {
+            border: 2px solid var(--main-red);
+            background: #fff5f5;
+        }
+    </style>
+    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet"> -->
+    
+    <!-- シンプルな画像表示CSS -->
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <strong>画像切り抜きツール</strong>
+            </a>
+            <!-- <div> -->
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link text-white" href="{% url 'configuration:configuration' %}">
+                    <i class="bi bi-house"></i> 設定ページに戻る
+                </a>
+                <!-- <a class="nav-link text-white" href="/configuration/workflow-manager/"> -->
+                    <a class="nav-link text-white" href="{% url 'configuration:workflow_manager' %}">
+                    <i class="bi bi-house"></i> ワークフロー管理に戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-4" style="max-width: 1200px;">
+        <div class="row">
+            <div class="col-12">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">ツールの目的</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <strong>切り抜きサイズ:</strong> 640×640px (正方形)<br>
+                            画像の切り抜きたい部分を決定し、すべてを包括する切り抜き位置とサイズを決定するためのツールです。<br>
+                            着目したい画像の部分を選択し、切り抜き位置を調整してください。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">
+                <!-- 画像ファイル選択エリア -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-folder2-open"></i> プロジェクト選択</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- フォルダから選択 -->
+                        <div id="folder-selection">
+                            <div class="mb-3">
+                                <label for="selection-mode" class="form-label">選択方法:</label>
+                                <select id="selection-mode" class="form-select" onchange="updateSelectionMode()">
+                                    <option value="predefined">定義済みパス</option>
+                                    <option value="project" selected>プロジェクト名から選択</option>
+                                    <option value="custom">カスタムパス</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 定義済みパス選択 -->
+                            <div id="predefined-selection" class="mb-3" style="display: none;">
+                                <label for="folder-path" class="form-label">画像フォルダパス:</label>
+                                <select id="folder-path" class="form-select" onchange="updateImagePath()">
+                                    <option value="snaps/snaps_auto/">snaps/snaps_auto/ (自動撮影)</option>
+                                    <option value="snaps/snaps_manual/">snaps/snaps_manual/ (手動撮影)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- プロジェクト名から選択 -->
+                            <div id="project-selection" class="mb-3">
+                                <div class="border border-danger rounded p-3 bg-light" style="border-width: 2px !important;">
+                                    <label for="project-name" class="form-label fw-bold text-danger">
+                                        <i class="bi bi-star-fill text-warning"></i> プロジェクト名:
+                                    </label>
+                                    <select id="project-name" class="form-select border-danger shadow-sm" style="border-width: 2px;" onchange="updateProjectFolders()">
+                                        <option value="">プロジェクトを選択してください...</option>
+                                    </select>
+                                    <div class="form-text text-danger mt-2">
+                                        <i class="bi bi-info-circle-fill"></i> プロジェクトを選択すると、自動的にフォルダが選択され、画像が読み込まれます
+                                    </div>
+                                    
+                                    <!-- デバッグボタン（開発用） -->
+                                    <div class="mt-2 d-flex gap-1">
+                                        <button type="button" class="btn btn-outline-info btn-sm" onclick="debugProjects()" title="プロジェクト状態確認">
+                                            <i class="bi bi-bug"></i> デバッグ
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadProjects()" title="プロジェクト再読み込み">
+                                            <i class="bi bi-arrow-clockwise"></i> 再読み込み
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- プロジェクト情報表示エリア -->
+                                    <div id="project-info-display" style="display: none;" class="mt-3 p-2 bg-info bg-opacity-10 border border-info rounded">
+                                        <!-- プロジェクト情報が動的に表示される -->
+                                    </div>
+                                    
+                                    <!-- プロジェクト読み込み状況表示エリア -->
+                                    <div id="project-status-display" class="mt-2 p-2 bg-light border rounded" style="font-size: 0.85em;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="text-muted">プロジェクト読み込み状況:</span>
+                                            <span id="project-status-text" class="badge bg-secondary">初期化中...</span>
+                                        </div>
+                                        <div id="project-debug-info" class="mt-1 text-muted small" style="display: none;">
+                                            <!-- デバッグ情報が表示される -->
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="project-folder-container" class="mt-3 p-2 bg-success bg-opacity-10 border border-success rounded" style="display: none;">
+                                        <label for="project-folder" class="form-label fw-semibold text-success">
+                                            <i class="bi bi-folder-fill"></i> フォルダ:
+                                        </label>
+                                        <select id="project-folder" class="form-select border-success" onchange="updateProjectPath()">
+                                            <option value="">フォルダを選択してください...</option>
+                                        </select>
+                                        
+                                        <!-- 自動選択状況表示エリア -->
+                                        <div id="auto-selection-status" class="mt-2 p-2 bg-white border rounded" style="font-size: 0.85em; display: none;">
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-gear-fill text-primary me-2"></i>
+                                                <span class="text-muted">自動選択:</span>
+                                                <span id="auto-selection-text" class="ms-2 badge bg-info">準備中...</span>
+                                            </div>
+                                            <div id="auto-selection-detail" class="mt-1 text-muted small">
+                                                <!-- 詳細情報が表示される -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- カスタムパス入力 -->
+                                    <div id="custom-selection" class="mb-3" style="display: none;">
+                                        <label for="custom-path" class="form-label">カスタムパス:</label>
+                                        <input type="text" id="custom-path" class="form-control" placeholder="カスタムパスを入力">
+                                    </div>
+                                    
+                                    <div id="file-list" style="display: none;">
+                                        <!-- 動的にファイル一覧が表示される（旧形式のサポート用） -->
+                                    </div>
+                                    
+                                    
+                                    <!-- 選択された画像の表示 -->
+                                    <div id="selected-image-info" class="alert alert-success" style="display: none;">
+                                        <strong>選択された画像:</strong> <span id="selected-image-name">未選択</span><br>
+                                        <button class="btn btn-success btn-sm mt-2" onclick="loadSelectedImage()" title="画像を読み込み">
+                                            <i class="bi bi-check-circle"></i> 画像を読み込み
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+   
+
+            <div class="col-md-9">
+                <!-- 元画像表示エリア -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-image"></i> 画像表示</h5>
+                        <!-- 現在選択されている画像ファイル名表示 -->
+                        <div id="current-image-info" style="display: none;">
+                            <small class="text-muted">現在の画像: <span id="current-image-name" class="fw-bold">未選択</span></small>
+                        </div>
+                    </div>
+                
+                    <div class="card-body">
+                        <!-- 画像ナビゲーション -->
+                        <div class="d-flex justify-content-between align-items-center mb-3" id="image-navigation" style="display: none;">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadPreviousImage()" id="prev-image-btn" disabled title="前の画像">
+                                <i class="bi bi-chevron-left"></i> 前の画像
+                            </button>
+                            <span id="image-counter" class="badge bg-primary">1 / 1</span>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadNextImage()" id="next-image-btn" disabled title="次の画像">
+                                次の画像 <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="{% if not image_url %}no-image{% endif %}" id="image-container">
+                            <div id="cropper-inner-wrapper">
+                                <img id="source-image" src="{% if image_url %}{{ image_url }}{% endif %}" alt="Source Image">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 操作パネル -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-gear"></i> 操作パネル</h5>
+                    </div>                  
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary w-100" onclick="addCropCoordinate()" title="座標を蓄積">
+                                <i class="bi bi-plus-circle"></i> 座標を蓄積
+                            </button>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <button class="btn btn-outline-secondary w-100" onclick="resetCrop()" title="リセット">
+                                        <i class="bi bi-arrow-clockwise"></i> リセット
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button class="btn btn-outline-secondary w-100" onclick="cropToCenter()" title="中央配置">
+                                        <i class="bi bi-bullseye"></i> 中央配置
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <button class="btn btn-outline-warning w-100" onclick="adjustCropSize(-50)" title="サイズ縮小">
+                                        <i class="bi bi-zoom-out"></i> サイズ縮小
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button class="btn btn-outline-warning w-100" onclick="adjustCropSize(50)" title="サイズ拡大">
+                                        <i class="bi bi-zoom-in"></i> サイズ拡大
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+                
+                    
+        <!-- プレビューエリア -->
+        <div class="card mb-4" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-eye"></i> プレビュー (640×640px)</h5>
+            </div>
+            <div class="card-body text-center">
+                <canvas id="preview-canvas" width="640" height="640" class="border rounded" style="max-width: 100%; height: auto;"></canvas>
+            </div>
+        </div>
+
+        
+        <!-- 画像選択モーダル（左側に配置） -->
+        <div id="image-modal" class="modal fade" tabindex="-1" style="--bs-modal-margin: 0.5rem;">
+            <div class="modal-dialog modal-lg" style="position: fixed; left: 2%; top: 10%; margin: 0;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">画像を選択してください</h5>
+                        <button type="button" class="btn-close" onclick="closeImageSelector()" title="閉じる"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="image-grid" class="row g-3">
+                            <!-- 画像サムネイルが動的に表示される -->
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeImageSelector()" title="キャンセル">キャンセル</button>
+                        <button class="btn btn-primary" onclick="confirmImageSelection()" disabled id="confirm-btn" title="選択">選択</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 画像表示モーダル（右側に配置） -->
+        <div id="image-display-modal" class="modal fade" tabindex="-1" style="--bs-modal-margin: 0.5rem;">
+            <div class="modal-dialog modal-lg" style="position: fixed; right: 2%; top: 10%; margin: 0;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">画像表示</h5>
+                        <button type="button" class="btn-close" onclick="closeImageDisplay()" title="閉じる"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-center">
+                            <img id="display-image" src="" alt="表示画像" class="img-fluid" style="max-width: 100%; max-height: 500px;">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeImageDisplay()" title="閉じる">閉じる</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <!-- 蓄積された座標リスト -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-list-ol"></i> 蓄積された切り抜き座標</h5>
+                        <span id="coordinates-count" class="badge bg-secondary">蓄積数: 0個</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="coordinates-list" class="mb-3">
+                            <div class="text-center text-muted">
+                                <i class="bi bi-info-circle"></i> まだ座標が蓄積されていません
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-outline-danger" onclick="clearAllCoordinates()" id="clear-all-btn" disabled>
+                                <i class="bi bi-trash"></i> 全ての座標データをクリア
+                            </button>
+                        </div>
+                        
+                        <!-- 包括座標表示 -->
+                        <div id="bounding-box-section" style="display: none;" class="mt-4">
+                            <div class="card border-success">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0"><i class="bi bi-bounding-box"></i> 包括座標（すべての座標を含む最小矩形）</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="bounding-box-info" class="mb-3">
+                                        <!-- 包括座標情報がここに表示される -->
+                                    </div>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button class="btn btn-success btn-sm" onclick="previewBoundingBox()" id="preview-bbox-btn">
+                                            <i class="bi bi-eye"></i> 包括座標をプレビュー
+                                        </button>
+                                        <button class="btn btn-outline-success btn-sm" onclick="clearBoundingBoxPreview()" id="clear-preview-btn" style="display: none;">
+                                            <i class="bi bi-eye-slash"></i> プレビューをクリア
+                                        </button>
+                                        <button class="btn btn-info btn-sm" onclick="saveBoundingBoxToYaml()" id="save-yaml-btn">
+                                            <i class="bi bi-file-earmark-code"></i> YAMLに保存
+                                        </button>
+                                        <!-- <button class="btn btn-warning btn-sm" onclick="downloadAllCrops()" id="download-all-btn" disabled>
+                                            <i class="bi bi-download"></i> 包括座標で全画像を切り抜き
+                                        </button> -->
+                                        <button class="btn btn-warning btn-sm" onclick="cropAndSaveAllImagesToCroppedFolder()" id="download-all-btn" disabled>
+                                            <i class="bi bi-download"></i> 包括座標で全画像を切り抜き保存
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- 包括座標プレビューセクション -->
+                                    <div id="bounding-box-preview" style="display: none;" class="mt-3 p-3 bg-warning bg-opacity-10 border border-warning rounded">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <i class="bi bi-eye-fill text-warning me-2"></i>
+                                            <strong class="text-warning">包括座標プレビュー中</strong>
+                                        </div>
+                                        <div id="preview-info" class="small text-muted">
+                                            <!-- プレビュー情報が表示される -->
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="bi bi-info-circle"></i> 画像上で黄色い枠線で包括座標エリアが表示されています
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <!-- 座標情報 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-info-circle"></i> 座標情報</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="crop-info" class="small text-muted">
+                            選択範囲の左上位置: X=0, Y=0 | 現在のサイズ: 0×0px | 最終出力: 640×640px
+                        </div>
+                        <hr class="my-2">
+                        <div class="small text-muted">
+                            <strong>座標の見方:</strong> X=左からの距離（ピクセル）, Y=上からの距離（ピクセル）
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <!-- ショートカットキーの説明 -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-keyboard"></i> ショートカットキー</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="small">
+                            <div class="mb-1">
+                                <kbd>Ctrl</kbd> + <kbd>←</kbd>/<kbd>→</kbd>: 前/次の画像に移動
+                            </div>
+                            <div class="mb-1">
+                                <kbd>Space</kbd>: 座標を蓄積
+                            </div>
+                            <div class="mb-1">
+                                <kbd>P</kbd>: 包括座標プレビューの切り替え
+                            </div>
+                            <div>
+                                <kbd>Esc</kbd>: モーダル/プレビューを閉じる
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隠しフィールド（JavaScript用） -->
+    {% csrf_token %}
+    <input type="hidden" id="process-crop-url" value="{% url 'process_crop' %}">
+    <input type="hidden" id="image-id" value="{{ image_id }}">
+
+    <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- Cropper.js 読み込み確認と強化されたフォールバック -->
+    <script>
+        // Cropper.js の読み込み状態を確認する関数
+        function checkCropperAvailability() {
+            if (typeof Cropper === 'undefined') {
+                console.warn('Cropper.js が読み込まれていません。フォールバックを実行します...');
+                return false;
+            } else {
+                console.log('Cropper.js 読み込み完了 - バージョン:', Cropper.version || 'Unknown');
+                return true;
+            }
+        }
+        
+        // 複数のフォールバックでCropper.jsを読み込む
+        function loadCropperFallback() {
+            const fallbackUrls = [
+                'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js',
+                'https://cdn.jsdelivr.net/npm/cropperjs@1.5.12/dist/cropper.min.js',
+                'https://unpkg.com/cropperjs@1.5.12/dist/cropper.min.js'
+            ];
+            
+            let currentFallback = 0;
+            
+            function tryNextFallback() {
+                if (currentFallback >= fallbackUrls.length) {
+                    console.error('全てのフォールバックURL読み込み失敗');
+                    showCropperError();
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = fallbackUrls[currentFallback];
+                script.onload = function() {
+                    console.log(`Cropper.js フォールバック読み込み成功: ${fallbackUrls[currentFallback]}`);
+                    // CSS も追加で読み込み
+                    loadCropperCSS();
+                };
+                script.onerror = function() {
+                    console.warn(`フォールバック失敗: ${fallbackUrls[currentFallback]}`);
+                    currentFallback++;
+                    tryNextFallback();
+                };
+                document.head.appendChild(script);
+            }
+            
+            tryNextFallback();
+        }
+        
+        // Cropper.js CSS を確実に読み込む
+        function loadCropperCSS() {
+            const cssUrls = [
+                'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css',
+                'https://cdn.jsdelivr.net/npm/cropperjs@1.5.12/dist/cropper.css',
+                'https://unpkg.com/cropperjs@1.5.12/dist/cropper.css'
+            ];
+            
+            cssUrls.forEach(url => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = url;
+                link.onerror = function() {
+                    console.warn('Cropper CSS 読み込み失敗:', url);
+                };
+                document.head.appendChild(link);
+            });
+        }
+        
+        // エラーメッセージを表示
+        function showCropperError() {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger mt-3';
+            alertDiv.innerHTML = `
+                <strong>エラー:</strong> Cropper.js ライブラリが読み込まれていません。<br>
+                <small>ネットワーク接続を確認してページを再読み込みしてください。</small>
+            `;
+            const container = document.querySelector('.container');
+            if (container) {
+                container.prepend(alertDiv);
+            }
+        }
+        
+        // 初期チェック
+        document.addEventListener('DOMContentLoaded', function() {
+            // 少し遅延してからチェック（他のスクリプトの読み込み完了を待つ）
+            setTimeout(() => {
+                if (!checkCropperAvailability()) {
+                    loadCropperFallback();
+                }
+            }, 100);
+        });
+        
+        // 最終的なチェック
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (!checkCropperAvailability()) {
+                    console.error('Cropper.js の読み込みに失敗しました');
+                    showCropperError();
+                } else {
+                    console.log('Cropper.js 利用可能 - 切り抜き機能が使用できます');
+                    
+                    // グローバルにCropper利用可能フラグを設定
+                    window.cropperReady = true;
+                    
+                    // カスタムイベントを発火（他のスクリプトに通知）
+                    const event = new CustomEvent('cropperReady', { detail: { version: Cropper.version || 'Unknown' } });
+                    document.dispatchEvent(event);
+                }
+            }, 500);
+        });
+    </script>
+    
+    <!-- シンプルな画像初期化スクリプト -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const imageContainer = document.getElementById('image-container');
+            const sourceImage = document.getElementById('source-image');
+            
+            // デバッグ用のログ関数
+            function debugLog(message, data = null) {
+                const timestamp = new Date().toLocaleTimeString();
+                console.log(`[${timestamp}] DEBUG: ${message}`, data || '');
+            }
+            
+            // // 画像の状態を監視する関数
+            // function monitorImageState() {
+            //     debugLog('=== 画像状態監視開始 ===');
+            //     debugLog('sourceImage.src', sourceImage.src);
+            //     debugLog('sourceImage.complete', sourceImage.complete);
+            //     debugLog('sourceImage.naturalWidth', sourceImage.naturalWidth);
+            //     debugLog('sourceImage.naturalHeight', sourceImage.naturalHeight);
+            //     debugLog('imageContainer.classList', Array.from(imageContainer.classList));
+            //     debugLog('=== 監視終了 ===');
+            // }
+            
+            // 初期状態の設定
+            function updateImageDisplay() {
+                debugLog('updateImageDisplay 開始');
+                
+                if (!sourceImage.src || 
+                    sourceImage.src === window.location.href || 
+                    sourceImage.src.includes('undefined') || 
+                    sourceImage.src.includes('None') ||
+                    sourceImage.src.endsWith('/')) {
+                    debugLog('No valid image detected, setting no-image state');
+                    imageContainer.classList.add('no-image');
+                } else {
+                    debugLog('Valid image detected');
+                    imageContainer.classList.remove('no-image');
+                }
+            }
+            
+            // 画像読み込み完了時
+            sourceImage.addEventListener('load', function() {
+                debugLog('sourceImage load event fired');
+                imageContainer.classList.remove('no-image');
+                // monitorImageState();
+            });
+            
+            sourceImage.addEventListener('error', function() {
+                debugLog('sourceImage error event fired');
+                imageContainer.classList.add('no-image');
+                // monitorImageState();
+            });
+            
+            // 初期状態の確認
+            debugLog('初期化開始');
+            updateImageDisplay();
+            
+            // グローバル関数として公開（他のスクリプトから呼び出せるように）
+            window.adjustImageContainerAspectRatio = function() {
+                debugLog('adjustImageContainerAspectRatio called from external');
+                updateImageDisplay();
+            };
+            
+            // 画像変更用のグローバル関数
+            window.changeImageSafely = function(newImageSrc) {
+                debugLog('changeImageSafely called from external', newImageSrc);
+                sourceImage.src = newImageSrc;
+                updateImageDisplay();
+            };
+            
+            // デバッグ用グローバル関数
+            window.debugImageState = function() {
+                // monitorImageState();
+            };
+            
+            // Cropper強制初期化用のグローバル関数（デバッグ用）
+            window.forceCropperInit = function() {
+                debugLog('forceCropperInit called - checking conditions');
+                
+                if (typeof Cropper === 'undefined') {
+                    console.error('Cropper.js が利用できません');
+                    return false;
+                }
+                
+                if (!sourceImage.src || sourceImage.src.includes('undefined')) {
+                    console.error('有効な画像が設定されていません');
+                    return false;
+                }
+                
+                if (sourceImage.naturalWidth === 0) {
+                    console.error('画像がまだ読み込まれていません');
+                    return false;
+                }
+                
+                debugLog('Conditions met, calling initializeCropper directly');
+                if (typeof initializeCropper === 'function') {
+                    initializeCropper();
+                    return true;
+                } else {
+                    console.error('initializeCropper function not found');
+                    return false;
+                }
+            };
+        });
+        
+        // Cropper.js 利用可能チェック
+        window.addEventListener('load', function() {
+            if (typeof Cropper === 'undefined') {
+                console.error('Cropper.js ライブラリが読み込まれていません');
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger mt-3';
+                alertDiv.innerHTML = '<strong>エラー:</strong> Cropper.js ライブラリが読み込まれていません。ページを再読み込みしてください。';
+                document.querySelector('.container').prepend(alertDiv);
+            } else {
+                console.log('Cropper.js ライブラリ読み込み完了 - バージョン:', Cropper.version || 'Unknown');
+            }
+        });
+    </script>
+    
+    <!-- Main crop functionality -->
+    <script src="{% static 'crop_app/crop.js' %}"></script>
+    
+    <!-- プロジェクト読み込み初期化スクリプト -->
+    <script>
+        // ページ読み込み完了後にプロジェクトを読み込み
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== プロジェクト読み込み初期化開始 ===');
+            
+            // loadProjects関数が定義されるまで待機
+            function waitForLoadProjects() {
+                if (typeof loadProjects === 'function') {
+                    console.log('loadProjects関数が利用可能です。プロジェクト読み込み開始...');
+                    loadProjects();
+                } else {
+                    console.log('loadProjects関数待機中...');
+                    setTimeout(waitForLoadProjects, 100);
+                }
+            }
+            
+            waitForLoadProjects();
+        });
+        
+        // デバッグ用：プロジェクト読み込み状況を確認する関数
+        window.debugProjects = function() {
+            console.log('=== プロジェクトデバッグ情報 ===');
+            console.log('allProjects:', typeof allProjects !== 'undefined' ? allProjects : '未定義');
+            console.log('currentProject:', typeof currentProject !== 'undefined' ? currentProject : '未定義');
+            console.log('currentFolder:', typeof currentFolder !== 'undefined' ? currentFolder : '未定義');
+            
+            const projectSelect = document.getElementById('project-name');
+            if (projectSelect) {
+                console.log('プロジェクトセレクター:', projectSelect.innerHTML);
+                console.log('選択されたプロジェクト:', projectSelect.value);
+            } else {
+                console.log('プロジェクトセレクターが見つかりません');
+            }
+            
+            // 画面上にもデバッグ情報を表示
+            if (typeof showDebugInfo === 'function') {
+                showDebugInfo();
+            }
+        };
+        
+        // エラーハンドリング
+        window.addEventListener('error', function(e) {
+            if (e.message.includes('loadProjects') || e.message.includes('project')) {
+                console.error('プロジェクト関連エラー:', e.message, e.filename, e.lineno);
+            }
+        });
+    </script>
+</body>
+</html>

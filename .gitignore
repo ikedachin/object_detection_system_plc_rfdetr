@@ -1,0 +1,65 @@
+# ------------------------------
+# OS / Editor
+# ------------------------------
+.DS_Store
+*/.DS_Store
+.vscode/
+.idea/
+
+# ------------------------------
+# Python
+# ------------------------------
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test / lint / type-check caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ------------------------------
+# Django / project specific
+# ------------------------------
+# Local SQLite DB
+object_detection_system/db.sqlite3
+
+# Runtime outputs and generated assets
+detect/*/
+projects/*/
+
+# Keep optional template project assets if used
+!projects/project_dummy/
+!projects/project_dummy/data_collection/
+!projects/project_dummy/data_collection/*.png
+
+# Local model artifacts and large weights
+model/
+yolo11n.pt
+
+# Local helper assets
+base_images/
+
+# Dependency lock file (generated locally)
+uv.lock
+
+
+# for dev
+references_for_rfdetr/

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RF-DETRモデル学習</title>
+    {% load static %}
+    <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #e8f5e9 0%, #b2dfdb 100%);
+        }
+        .param-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr 1fr;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.2rem;
+        }
+        .param-grid label {
+            margin-bottom: 0;
+            text-align: left;
+            align-self: stretch;
+            display: flex;
+            align-items: center;
+        }
+        .param-grid .form-control, .param-grid .form-select {
+            width: 100%;
+            min-width: unset;
+            max-width: unset;
+        }
+        .param-grid .param-info-btn, .param-grid .param-reset-btn {
+            width: 100%;
+            min-width: 100px;
+            text-align: center;
+            margin-left: 0;
+            color: #222 !important;
+        }
+        .navbar-orange {
+            background: linear-gradient(90deg, #43a047 0%, #a5d6a7 100%);
+        }
+        .card-header {
+            background-color: #43a047 !important;
+            color: #fff !important;
+            border: none;
+            letter-spacing: 0.03em;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.10);
+        }
+        .btn-primary, .btn-secondary {
+            background-color: #43a047 !important;
+            color: #fff !important;
+            border: none;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.10);
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary:hover, .btn-secondary:hover, .btn-primary:focus, .btn-secondary:focus {
+            background-color: #388e3c !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(67,160,71,0.18);
+        }
+        #viewYamlBtn {
+            background: #43a047 !important;
+            color: #fff !important;
+            border: 2px solid #43a047 !important;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+        }
+        #viewYamlBtn:hover, #viewYamlBtn:focus {
+            background: #fff !important;
+            color: #43a047 !important;
+            border: 2px solid #43a047 !important;
+            box-shadow: 0 2px 8px rgba(67,160,71,0.18);
+        }
+        .btn-outline-primary, .btn-outline-secondary {
+            color: #222 !important;
+            background: #a5d6a7 !important;
+            border-color: #43a047 !important;
+            font-weight: 600;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+        }
+        .btn-outline-primary:hover, .btn-outline-secondary:hover, .btn-outline-primary:focus, .btn-outline-secondary:focus {
+            background-color: #fff !important;
+            color: #43a047 !important;
+            border-color: #43a047 !important;
+            box-shadow: 0 2px 8px rgba(67,160,71,0.18);
+        }
+        .center-btn {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #trainForm .btn-primary.mt-3 {
+            font-size: 1.4rem;
+            padding: 0.8rem 3rem;
+            border-radius: 2rem;
+            box-shadow: 0 4px 16px rgba(67,160,71,0.15);
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);
+            color: #111 !important;
+            border: none;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+            text-shadow: 0 2px 8px rgba(44,62,80,0.10);
+        }
+        #trainForm .btn-primary.mt-3:hover,
+        #trainForm .btn-primary.mt-3:focus,
+        #trainForm .btn-primary.mt-3:active {
+            background: linear-gradient(90deg, #00ff99 0%, #00ccff 40%, #ffeb3b 80%, #ff4081 100%);
+            color: #111 !important;
+            box-shadow: 0 8px 32px rgba(255,64,129,0.25), 0 0 16px 4px #ffeb3b66;
+            text-shadow: 0 2px 12px rgba(255,64,129,0.18);
+        }
+        .form-label {
+            color: #388e3c;
+            font-weight: 600;
+            font-size: 1.25rem;
+            min-width: 8em;
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+        }
+        .form-select, .form-control {
+            min-width:320px;
+            max-width:480px;
+            border-radius: 0.5rem;
+            border: 1.5px solid #a5d6a7;
+            font-size: 1.15rem;
+            display: inline-block;
+        }
+        .form-row-flex {
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+            margin-bottom: 1.2rem;
+        }
+        .modal-content {
+            border-radius: 1rem;
+        }
+        .alert-success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border: 1.5px solid #43a047;
+            font-weight: 600;
+        }
+        .alert-danger {
+            background: #e8f5e9;
+            color: #c62828;
+            border: 1.5px solid #43a047;
+            font-weight: 600;
+        }
+        .badge.bg-primary {
+            background-color: #43a047 !important;
+            color: #fff !important;
+            font-weight: 600;
+        }
+        .btn-close {
+            filter: invert(60%) sepia(80%) saturate(500%) hue-rotate(0deg) brightness(110%) contrast(110%);
+        }
+        h1, h5, h6, label, .navbar-brand {
+            text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+        }
+        .input-group .btn {
+            border-radius: 0 0.5rem 0.5rem 0 !important;
+        }
+        .input-group .form-select {
+            border-radius: 0.5rem 0 0 0.5rem !important;
+        }
+        .btn,
+        .btn-primary,
+        .btn-secondary,
+        .btn-outline-primary,
+        .btn-outline-secondary,
+        .param-info-btn,
+        .param-reset-btn,
+        #viewYamlBtn,
+        .btn-close {
+            color: #222;
+        }
+        .btn:hover,
+        .btn:focus,
+        .btn:active,
+        .btn-primary:hover,
+        .btn-primary:focus,
+        .btn-primary:active,
+        .btn-secondary:hover,
+        .btn-secondary:focus,
+        .btn-secondary:active,
+        .btn-outline-primary:hover,
+        .btn-outline-primary:focus,
+        .btn-outline-primary:active,
+        .btn-outline-secondary:hover,
+        .btn-outline-secondary:focus,
+        .btn-outline-secondary:active,
+        .param-info-btn:hover,
+        .param-info-btn:focus,
+        .param-info-btn:active,
+        .param-reset-btn:hover,
+        .param-reset-btn:focus,
+        .param-reset-btn:active,
+        #viewYamlBtn:hover,
+        #viewYamlBtn:focus,
+        #viewYamlBtn:active,
+        #trainForm .btn-primary.mt-3:hover,
+        #trainForm .btn-primary.mt-3:focus,
+        #trainForm .btn-primary.mt-3:active {
+            color: #222;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-orange navbar-expand-lg">
+    <div class="container">
+      <a class="navbar-brand fw-bold text-white" href="">
+        <i class="bi bi-cpu"></i> モデル学習
+      </a>
+    </div>
+    <div class="navbar-nav ms-auto">
+      <a class="nav-link text-white" href="{% url 'configuration:configuration' %}">
+        <i class="bi bi-house"></i> 設定ページに戻る
+      </a>
+      <a class="nav-link text-white" href="/configuration/workflow-manager/">
+        <i class="bi bi-diagram-3"></i> ワークフロー管理に戻る
+      </a>
+    </div>
+</nav>
+<div class="container mt-4">
+  <div class="card shadow-lg mb-4">
+    <div class="card-header text-center">
+        <h1 class="mb-0">🧠 学習パラメーター設定</h1>
+    </div>
+    <div class="card-body">
+    <form id="trainForm" method="post">
+      {% csrf_token %}
+      <div class="param-grid">
+        <label for="project_name" class="form-label">プロジェクト名</label>
+        <select class="form-select" id="project_name" name="project_id">
+            {% for project in projects %}
+            <option value="{{ project.id }}" data-project-name="{{ project.name }}" data-is-active="{{ project.is_active|yesno:'true,false' }}" {% if project.name == selected_project %}selected{% endif %}>
+                {{ project.name }}
+                {% if project.is_active %}（アクティブ）{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="param-grid">
+        <label for="training_name" class="form-label">学習名</label>
+        <input type="text" class="form-control" id="training_name" name="training_name" placeholder="プロジェクト名_YYYYMMDD_HHMMSS（空白の場合は自動生成）">
+        <button type="button" class="btn btn-outline-secondary" id="generateNameBtn">自動生成</button>
+        <div></div>
+      </div>
+      <div class="param-grid">
+        <label for="dataset_yaml" class="form-label">データセットyaml</label>
+        <select class="form-select" id="dataset_yaml" name="dataset_yaml">
+            {% for yaml in dataset_yamls %}
+            <option value="{{ yaml.name }}" data-fullpath="{{ yaml.fullpath }}">{{ yaml.name }}</option>
+            {% empty %}
+            <option value="">データセットyaml未生成</option>
+            {% endfor %}
+        </select>
+        <button type="button" class="btn btn-outline-secondary" id="viewYamlBtn">設定表示 / 編集</button>
+        <div></div>
+        <input type="hidden" id="dataset_yaml_fullpath" name="dataset_yaml_fullpath" value="{% if dataset_yamls %}{{ dataset_yamls.0.fullpath }}{% endif %}">
+        <div id="yamlModal" class="modal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">データセットyaml内容</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <textarea id="yamlContentArea" class="form-control" rows="12"></textarea>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="saveYamlBtn">保存</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="param-grid">
+        <label for="model_name" class="form-label">モデル名</label>
+        <input type="text" class="form-control" id="model_name" name="model_name" value="Roboflow/rf-detr-large">
+        <div></div>
+        <div></div>
+      </div>
+      <div class="param-grid">
+        <label for="data_type" class="form-label">データ種別</label>
+        <select class="form-select" id="data_type" name="data_type">
+            <option value="data_collection" {% if selected_data_type == 'data_collection' %}selected{% endif %}>data_collection</option>
+            <option value="cropped" {% if selected_data_type == 'cropped' %}selected{% endif %}>cropped</option>
+        </select>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="param-grid">
+        <label for="epochs" class="form-label">エポック数</label>
+        <input type="number" class="form-control" id="epochs" name="epochs" value="100">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#epochsInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetEpochs">リセット</button>
+      </div>
+      <div class="param-grid">
+        <label for="batch" class="form-label">バッチサイズ</label>
+        <input type="number" class="form-control" id="batch" name="batch" value="16">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#batchInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetBatch">リセット</button>
+      </div>
+      <div class="param-grid">
+        <label for="imgsz" class="form-label">画像サイズ</label>
+        <input type="text" class="form-control" id="imgsz" name="imgsz" value="640">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#imgszInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetImgsz">リセット</button>
+      </div>
+      <div class="param-grid">
+        <label for="flipud" class="form-label">上下反転確率 (flipud)</label>
+        <input type="number" step="0.01" min="0" max="1" class="form-control" id="flipud" name="flipud" value="0.0">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#flipudInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetFlipud">リセット</button>
+      </div>
+      <div class="param-grid">
+        <label for="fliplr" class="form-label">左右反転確率 (fliplr)</label>
+        <input type="number" step="0.01" min="0" max="1" class="form-control" id="fliplr" name="fliplr" value="0.5">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#fliplrInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetFliplr">リセット</button>
+      </div>
+      <div class="param-grid">
+        <label for="mixup" class="form-label">MixUp合成率 (mixup)</label>
+        <input type="number" step="0.01" min="0" max="0.1" class="form-control" id="mixup" name="mixup" value="0.0">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#mixupInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetMixup">リセット</button>
+      </div>
+      <div class="param-grid">
+        <label for="perspective" class="form-label">遠近変換強度 (perspective)</label>
+        <input type="number" step="0.0001" min="0" max="0.001" class="form-control" id="perspective" name="perspective" value="0.0000">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#perspectiveInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetPerspective">リセット</button>
+      </div>
+      <div class="param-grid">
+        <label for="shear" class="form-label">シアー強度 (shear)</label>
+        <input type="number" step="0.01" min="0" max="1" class="form-control" id="shear" name="shear" value="0.0">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#shearInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetShear">リセット</button>
+      </div>
+      <div class="param-grid">
+        <label for="scale" class="form-label">スケール変換範囲 (scale)</label>
+        <input type="number" step="0.01" min="0" max="1" class="form-control" id="scale" name="scale" value="0.5">
+        <button type="button" class="btn btn-outline-secondary param-info-btn" data-bs-toggle="modal" data-bs-target="#scaleInfoModal">説明</button>
+        <button type="button" class="btn btn-outline-secondary param-reset-btn" id="resetScale">リセット</button>
+      </div>
+      <!-- エポック数説明モーダル -->
+      <div class="modal fade" id="epochsInfoModal" tabindex="-1" aria-labelledby="epochsInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="epochsInfoModalLabel">エポック数の説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              学習データ全体を何回繰り返して学習するかを指定します。値を大きくすると学習が長くなりますが、過学習に注意が必要です。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 画像サイズ説明モーダル -->
+      <div class="modal fade" id="imgszInfoModal" tabindex="-1" aria-labelledby="imgszInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="imgszInfoModalLabel">画像サイズの説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              入力画像をリサイズする際の一辺の長さを指定します。大きいほど精度が上がる場合がありますが、メモリ消費も増えます。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- バッチサイズ説明モーダル -->
+      <div class="modal fade" id="batchInfoModal" tabindex="-1" aria-labelledby="batchInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="batchInfoModalLabel">バッチサイズの説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              1回の学習で同時に処理するデータ数を指定します。大きいほど学習が速くなりますが、メモリ消費も増えます。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- flipud説明モーダル -->
+      <div class="modal fade" id="flipudInfoModal" tabindex="-1" aria-labelledby="flipudInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="flipudInfoModalLabel">上下反転確率 (flipud) の説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              画像を上下反転する確率を指定します。0.0で反転なし、1.0で常に反転。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- fliplr説明モーダル -->
+      <div class="modal fade" id="fliplrInfoModal" tabindex="-1" aria-labelledby="fliplrInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="fliplrInfoModalLabel">左右反転確率 (fliplr) の説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              画像を左右反転する確率を指定します。0.0で反転なし、1.0で常に反転。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- mixup説明モーダル -->
+      <div class="modal fade" id="mixupInfoModal" tabindex="-1" aria-labelledby="mixupInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="mixupInfoModalLabel">MixUp合成率 (mixup) の説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              画像同士を合成するMixUpの割合を指定します。0.0でMixUpなし、0.1で最大MixUp（通常は小さな値を推奨）。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- perspective説明モーダル -->
+      <div class="modal fade" id="perspectiveInfoModal" tabindex="-1" aria-labelledby="perspectiveInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="perspectiveInfoModalLabel">遠近変換強度 (perspective) の説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              画像に遠近変換を加える強度を指定します。0.0で変換なし、0.001で最大変換（通常は非常に小さな値を推奨）。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- shear説明モーダル -->
+      <div class="modal fade" id="shearInfoModal" tabindex="-1" aria-labelledby="shearInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="shearInfoModalLabel">シアー強度 (shear) の説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              画像にシアー（斜め変形）を加える強度を指定します。0.0で変形なし、1.0で最大変形。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- scale説明モーダル -->
+      <div class="modal fade" id="scaleInfoModal" tabindex="-1" aria-labelledby="scaleInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="scaleInfoModalLabel">スケール変換範囲 (scale) の説明</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              画像の拡大・縮小の範囲を指定します。0.0で変化なし、1.0で最大範囲。
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn btn-secondary mb-2" data-bs-toggle="collapse" data-bs-target="#detailParams" style="color:#222 !important;">詳細パラメータ</button>
+      <div class="collapse" id="detailParams">
+        <div class="card card-body">
+          <label for="other_params" class="form-label">詳細パラメータ(JSON形式)</label>
+          <textarea class="form-control" id="other_params" name="other_params" rows="4">{"workers": 1}</textarea>
+        </div>
+      </div>
+      <div id="metricsArea" class="mt-4"></div>
+      <div class="center-btn mt-4">
+          <button type="submit" class="btn btn-primary mt-3" id="trainSubmitBtn">
+            <span class="btn-text"><i class="bi bi-rocket-takeoff"></i> 学習スタート</span>
+            <span class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true" id="trainSpinner"></span>
+          </button>
+        </div>
+    </form>
+    <div id="trainResult" class="mt-4"></div>
+        </div>
+    </div>
+  </div>
+</div>
+<script src="/static/training/train.js"></script>
+<script src="/static/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // 各パラメータのリセットボタン
+    document.getElementById('resetEpochs').addEventListener('click', function() {
+      document.getElementById('epochs').value = 100;
+    });
+    document.getElementById('resetBatch').addEventListener('click', function() {
+      document.getElementById('batch').value = 16;
+    });
+    document.getElementById('resetImgsz').addEventListener('click', function() {
+      document.getElementById('imgsz').value = 640;
+    });
+    document.getElementById('resetFlipud').addEventListener('click', function() {
+      document.getElementById('flipud').value = 0.0;
+    });
+    document.getElementById('resetFliplr').addEventListener('click', function() {
+      document.getElementById('fliplr').value = 0.5;
+    });
+    document.getElementById('resetMixup').addEventListener('click', function() {
+      document.getElementById('mixup').value = 0.0;
+    });
+    document.getElementById('resetPerspective').addEventListener('click', function() {
+      document.getElementById('perspective').value = 0.0;
+    });
+    document.getElementById('resetShear').addEventListener('click', function() {
+      document.getElementById('shear').value = 0.0;
+    });
+    document.getElementById('resetScale').addEventListener('click', function() {
+      document.getElementById('scale').value = 0.5;
+    });
+    const yamlSelect = document.getElementById('dataset_yaml');
+
+    // yaml内容表示・編集モーダル
+    const viewYamlBtn = document.getElementById('viewYamlBtn');
+    const yamlModal = new bootstrap.Modal(document.getElementById('yamlModal'));
+    const yamlContentArea = document.getElementById('yamlContentArea');
+    const saveYamlBtn = document.getElementById('saveYamlBtn');
+    viewYamlBtn.addEventListener('click', function() {
+      if (!yamlSelect || yamlSelect.selectedIndex < 0 || !yamlSelect.options[yamlSelect.selectedIndex].dataset.fullpath) {
+        alert('データセットyamlが選択されていません。アノテーション分割を実行してください。');
+        return;
+      }
+      const yamlPath = yamlSelect.options[yamlSelect.selectedIndex].dataset.fullpath;
+      fetch(`?yaml_path=${encodeURIComponent(yamlPath)}`)
+        .then(res => res.text())
+        .then(text => {
+            yamlContentArea.value = text;
+            yamlModal.show();
+        });
+    });
+    saveYamlBtn.addEventListener('click', function() {
+      if (!yamlSelect || yamlSelect.selectedIndex < 0 || !yamlSelect.options[yamlSelect.selectedIndex].dataset.fullpath) {
+        alert('データセットyamlが選択されていません。');
+        return;
+      }
+      const yamlPath = yamlSelect.options[yamlSelect.selectedIndex].dataset.fullpath;
+      fetch('', {
+        method: 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `yaml_edit_path=${encodeURIComponent(yamlPath)}&yaml_content=${encodeURIComponent(yamlContentArea.value)}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert('保存しました');
+          yamlModal.hide();
+        } else {
+          alert('保存失敗: ' + (data.error || ''));
+        }
+      });
+    });
+
+    // 学習ボタンのアニメーション
+    const trainForm = document.getElementById('trainForm');
+    const trainBtn = document.getElementById('trainSubmitBtn');
+    const trainSpinner = document.getElementById('trainSpinner');
+    const btnText = trainBtn.querySelector('.btn-text');
+    if (trainForm && trainBtn && trainSpinner && btnText) {
+      let trainingInProgress = false;
+      trainForm.addEventListener('submit', function(e) {
+        if (trainingInProgress) {
+          // 2重送信防止
+          e.preventDefault();
+          return false;
+        }
+        trainingInProgress = true;
+        btnText.textContent = '学習中...';
+        trainSpinner.classList.remove('d-none');
+        trainBtn.disabled = true;
+        // trainResultを非表示にする
+        const trainResult = document.getElementById('trainResult');
+        if (trainResult) {
+          trainResult.style.display = 'none';
+        }
+      });
+      // trainResultの内容が変わったらボタンを元に戻す
+      const trainResult = document.getElementById('trainResult');
+      if (trainResult) {
+        const observer = new MutationObserver(function(mutationsList, observer) {
+          if (trainResult.innerHTML.trim() !== '') {
+            btnText.innerHTML = '<i class="bi bi-rocket-takeoff"></i> 学習スタート';
+            trainSpinner.classList.add('d-none');
+            trainBtn.disabled = false;
+            trainingInProgress = false;
+            // trainResultを再表示する
+            trainResult.style.display = '';
+          }
+        });
+        observer.observe(trainResult, { childList: true, subtree: true });
+      }
+    }
+
+    // RF-DETR学習進捗WebSocket受信
+    const metricsArea = document.getElementById('metricsArea');
+    const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${ws_scheme}://${window.location.host}/ws/rfdetr_training/`);
+    ws.onmessage = function(event) {
+      const data = JSON.parse(event.data);
+      const epoch = data.epoch;
+      const total_epochs = data.total_epochs;
+      const metrics = data.metrics;
+      let html = `学習が終わるまでストップすることはできません。<br><br><b>Epoch: ${epoch} / ${total_epochs}</b><br>`;
+      for (const [k, v] of Object.entries(metrics)) {
+        html += `${k}: ${v}<br>`;
+      }
+      metricsArea.innerHTML = html;
+    };
+  });
+</script>
+</body>
+</html>

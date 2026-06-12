@@ -1,0 +1,18 @@
+<!-- Crop画像選択モーダル -->
+<div class="modal fade" id="cropSelectModal" tabindex="-1" aria-labelledby="cropSelectModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cropSelectModalLabel">画像種別の選択</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>このプロジェクトには <span id="modal-cropped-count"></span> 枚のcrop画像があります。どちらの画像を使いますか？</p>
+        <div class="d-grid gap-2">
+          <button id="use-cropped-btn" class="btn btn-primary">crop画像を使う</button>
+          <button id="use-original-btn" class="btn btn-outline-secondary">オリジナル画像を使う</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

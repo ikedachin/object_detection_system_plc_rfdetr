@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }} - RF-DETR アノテーター</title>
+    {% load static %}
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .project-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .file-size {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .project-stats {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .drag-drop-zone {
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            transition: border-color 0.3s ease;
+            cursor: pointer;
+            background: #f8f9fa;
+        }
+        .drag-drop-zone:hover {
+            border-color: #0d6efd;
+            background: #e7f1ff;
+        }
+        .drag-drop-zone.dragover {
+            border-color: #0d6efd;
+            background: #e7f1ff;
+            box-shadow: 0 0 15px rgba(13, 110, 253, 0.2);
+        }
+        .modal-lg {
+            max-width: 800px;
+        }
+        .project-detail-table {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'configuration:configuration' %}">
+                <strong>RF-DETR アノテーター - {{ page_title }}</strong>
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{% url 'configuration:configuration' %}">
+                    <i class="bi bi-arrow-left me-1"></i>設定ページに戻る
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-4">
+        <!-- ヘッダー -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="mb-1">{{ page_title }}</h2>
+                        <p class="text-muted">プロジェクトの追加・削除・管理を行います</p>
+                    </div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProjectModal">
+                        <i class="bi bi-plus-circle me-2"></i>新しいプロジェクトを追加
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- プロジェクト統計 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="project-stats">
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <h5 class="text-primary mb-1">{{ projects|length }}</h5>
+                            <small class="text-muted">プロジェクト数</small>
+                        </div>
+                        <div class="col-md-4">
+                            <h5 class="text-success mb-1">{{ projects|length|add:0 }}</h5>
+                            <small class="text-muted">総画像数</small>
+                        </div>
+                        <div class="col-md-4">
+                            <h5 class="text-info mb-1">{{ data_collection_dir }}</h5>
+                            <small class="text-muted">保存先</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- プロジェクト一覧 -->
+        <div class="row">
+            {% if projects %}
+                {% for project in projects %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card project-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-folder-fill text-primary me-2"></i>
+                                    {{ project.name }}
+                                    {% if project.is_active %}
+                                        <span class="badge bg-success ms-2">アクティブ</span>
+                                        <a href="/annotator/" class="btn btn-outline-primary btn-sm ms-2">
+                                            <i class="bi bi-tags text-success me-3"></i> アノテーション
+                                        </a>
+                                    {% endif %}
+                                </h5>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="dropdown-item" href="#" onclick="showProjectDetails('{{ project.name }}')">
+                                                <i class="bi bi-info-circle me-2"></i>詳細を表示
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item text-danger" href="#" onclick="confirmDeleteProject('{{ project.name }}')">
+                                                <i class="bi bi-trash me-2"></i>削除
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>画像数:</span>
+                                    <span class="badge bg-primary">{{ project.image_count }}</span>
+                                </div>
+                                <!-- <div class="d-flex justify-content-between mb-2">
+                                    <span>サイズ:</span>
+                                    <span class="file-size">{{ project.size_str }}</span>
+                                </div> -->
+                                <div class="d-flex justify-content-between">
+                                    <span>作成日:</span>
+                                    <!-- <span class="file-size">{{ project.created_date|date:"Y/m/d H:i" }}</span> -->
+                                    <span class="file-size">{{ created_date }}</span>
+                                </div>
+                            </div>
+                            {% if not project.is_active %}
+                                <div class="mb-2 text-end">
+                                    <button class="btn btn-outline-success btn-sm" onclick="activateProject('{{ project.name }}')">
+                                        <i class="bi bi-check-circle me-1"></i>Activate
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <small class="text-muted">
+                                <i class="bi bi-folder me-1"></i>{{ project.save_path }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12">
+                    <div class="text-center py-5">
+                        <i class="bi bi-folder-x text-muted" style="font-size: 4rem;"></i>
+                        <h4 class="text-muted mt-3">プロジェクトがありません</h4>
+                        <p class="text-muted">「新しいプロジェクトを追加」ボタンからプロジェクトを作成してください。</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProjectModal">
+                            <i class="bi bi-plus-circle me-2"></i>最初のプロジェクトを作成
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- プロジェクト追加モーダル -->
+    <div class="modal fade" id="addProjectModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">新しいプロジェクトを追加</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addProjectForm">
+                        <div class="mb-4">
+                            <label for="sourceFolder" class="form-label">元フォルダのパス <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="sourceFolder" placeholder="例: base_images, C:\Users\YourName\Pictures\project_data" required>
+                                <button type="button" class="btn btn-outline-secondary" onclick="selectFolder()">
+                                    <i class="bi bi-folder-open me-1"></i>参照
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                画像ファイルが含まれているフォルダのパスを入力してください。
+                                プロジェクトルートからの相対パスまたは絶対パスが使用できます。
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="projectName" class="form-label">プロジェクト名 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="projectName" placeholder="例: product_detection_2024" required>
+                            <div class="form-text">
+                                プロジェクト名は英数字とアンダースコア、ハイフンのみ使用可能です。
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">利用可能なフォルダ例:</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setSourceFolder('base_images')">
+                                    base_images
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setSourceFolder('crop_preparation/source')">
+                                    crop_preparation/source
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setSourceFolder('annotation_data/images')">
+                                    annotation_data/images
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setSourceFolder('test_project_20250703')">
+                                    test_project_20250703
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setSourceFolder('project_20250703_122819')">
+                                    project_20250703_122819
+                                </button>
+                            </div>
+                            <div class="form-text mt-2">
+                                既存のプロジェクトフォルダからコピーする場合、元フォルダ名をクリックして選択できます。
+                            </div>
+                        </div>
+                        
+                        <!-- ドラッグ&ドロップエリア -->
+                        <div class="drag-drop-zone mb-4" id="dragDropZone">
+                            <i class="bi bi-cloud-upload text-muted" style="font-size: 3rem;"></i>
+                            <h5 class="text-muted mt-2">フォルダをここにドラッグ&ドロップ</h5>
+                            <p class="text-muted mb-0">または上の「参照」ボタンでフォルダを選択</p>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" id="addProjectBtn" data-url="{% url 'configuration:add_project' %}" onclick="addProject()">
+                        <i class="bi bi-plus-circle me-2"></i>プロジェクトを追加
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- プロジェクト詳細モーダル -->
+    <div class="modal fade" id="projectDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">プロジェクト詳細</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="projectDetailContent">
+                    <!-- 詳細内容がここに動的に挿入されます -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 削除確認モーダル -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger">プロジェクトの削除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>警告:</strong> この操作は元に戻せません。
+                    </div>
+                    <p>プロジェクト「<strong id="deleteProjectName"></strong>」を削除しますか？</p>
+                    <p class="text-muted">すべてのファイルが完全に削除されます。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-danger" onclick="deleteProject()">
+                        <i class="bi bi-trash me-2"></i>削除する
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast通知 -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="toast" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="bi bi-info-circle-fill text-primary me-2"></i>
+                <strong class="me-auto">通知</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+                <!-- メッセージがここに表示されます -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentDeleteProject = '';
+        
+        function selectFolder() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.webkitdirectory = true;
+            input.directory = true;
+            input.multiple = true;
+            input.onchange = function(e) {
+                const files = Array.from(e.target.files);
+                if (files.length > 0) {
+                    // 画像ファイルのみ抽出
+                    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+                    // 最初のファイルのwebkitRelativePathからフォルダ名取得
+                    let folderName = '';
+                    if (files[0].webkitRelativePath) {
+                        const parts = files[0].webkitRelativePath.split('/');
+                        folderName = parts.length > 1 ? parts[0] : '';
+                    } else {
+                        folderName = files[0].name;
+                    }
+                    document.getElementById('sourceFolder').value = folderName;
+                    document.getElementById('projectName').value = folderName;
+                    window.selectedImageFiles = imageFiles;
+                }
+            };
+            input.click();
+        }
+        
+        function setSourceFolder(folderPath) {
+            document.getElementById('sourceFolder').value = folderPath;
+            // フォルダ名をプロジェクト名に自動セット（変更可能）
+            const folderName = folderPath.split('/').pop().split('\\').pop();
+            document.getElementById('projectName').value = folderName;
+        }
+        
+        // ドラッグ&ドロップ機能
+        const dropZone = document.getElementById('dragDropZone');
+        
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        
+        dropZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+        
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const items = e.dataTransfer.items;
+            if (items && items.length > 0) {
+                // フォルダエントリ取得
+                const item = items[0];
+                if (item.kind === 'file') {
+                    const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+                    if (entry && entry.isDirectory) {
+                        document.getElementById('sourceFolder').value = entry.name;
+                        document.getElementById('projectName').value = entry.name;
+                    }
+                }
+            }
+        });
+        
+        function addProject() {
+            console.log('addProject called'); // デバッグ用
+            let projectName = document.getElementById('projectName').value.trim();
+            const sourceFolder = document.getElementById('sourceFolder').value.trim();
+            if (!projectName && sourceFolder) {
+                projectName = sourceFolder.split('/').pop().split('\\').pop();
+                document.getElementById('projectName').value = projectName;
+            }
+            if (!projectName) {
+                showToast('プロジェクト名を入力してください', 'error');
+                return;
+            }
+            if (!sourceFolder) {
+                showToast('元フォルダのパスを入力してください', 'error');
+                return;
+            }
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>作成中...';
+            const addProjectUrl = document.getElementById('addProjectBtn').getAttribute('data-url');
+            // FormDataで送信
+            const formData = new FormData();
+            formData.append('project_name', projectName);
+            formData.append('source_folder', sourceFolder);
+            if (window.selectedImageFiles && window.selectedImageFiles.length > 0) {
+                window.selectedImageFiles.forEach(file => {
+                    formData.append('images', file, file.webkitRelativePath || file.name);
+                });
+            }
+            fetch(addProjectUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('API Response:', data);  // デバッグ用
+                if (data.success) {
+                    let message = data.message;
+                    if (data.copied_files > 0) {
+                        message += ` (画像ファイル: ${data.copied_files}件)`;
+                    }
+                    if (data.warnings) {
+                        message += `\n注意: ${data.warnings}`;
+                    }
+                    showToast(message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('addProjectModal')).hide();
+                    document.getElementById('addProjectForm').reset();
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    console.error('API Error:', data.error);  // デバッグ用
+                    showToast(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Request Error:', error);  // デバッグ用
+                showToast('エラーが発生しました: ' + error.message, 'error');
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-plus-circle me-2"></i>プロジェクトを追加';
+            });
+        }
+        
+        function confirmDeleteProject(projectName) {
+            currentDeleteProject = projectName;
+            document.getElementById('deleteProjectName').textContent = projectName;
+            new bootstrap.Modal(document.getElementById('deleteConfirmModal')).show();
+        }
+        
+        function deleteProject() {
+            if (!currentDeleteProject) return;
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>削除中...';
+            
+            fetch("{% url 'configuration:delete_project' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    project_name: currentDeleteProject
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showToast(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('エラーが発生しました: ' + error.message, 'error');
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-trash me-2"></i>削除する';
+            });
+        }
+        
+        function showProjectDetails(projectName) {
+            fetch(`{% url 'configuration:get_project_info' %}?project_name=${encodeURIComponent(projectName)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const project = data.project_info;
+                    const modalContent = document.getElementById('projectDetailContent');
+                    
+                    modalContent.innerHTML = `
+                        <div class="project-detail-info">
+                            <h5><i class="bi bi-folder-fill text-primary me-2"></i>${project.name}</h5>
+                            <table class="table table-sm project-detail-table">
+                                <tr>
+                                    <td><strong>パス:</strong></td>
+                                    <td>${project.path}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>画像数:</strong></td>
+                                    <td><span class="badge bg-primary">${project.image_count}</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>総サイズ:</strong></td>
+                                    <td>${project.size_str}</td>
+                                </tr>
+                            </table>
+                            
+                            ${project.files.length > 0 ? `
+                                <h6 class="mt-4">ファイル一覧（最初の100件）</h6>
+                                <div class="table-responsive" style="max-height: 300px;">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>ファイル名</th>
+                                                <th>パス</th>
+                                                <th>サイズ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${project.files.map(file => `
+                                                <tr>
+                                                    <td>${file.name}</td>
+                                                    <td class="text-muted small">${file.relative_path}</td>
+                                                    <td class="text-end">${formatFileSize(file.size)}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ` : '<p class="text-muted">ファイルがありません</p>'}
+                        </div>
+                    `;
+                    
+                    new bootstrap.Modal(document.getElementById('projectDetailModal')).show();
+                } else {
+                    showToast(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('エラーが発生しました: ' + error.message, 'error');
+            });
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+        }
+        
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastHeader = toast.querySelector('.toast-header i');
+            
+            toastMessage.textContent = message;
+            
+            // アイコンと色を変更
+            toastHeader.className = 'bi me-2';
+            if (type === 'success') {
+                toastHeader.classList.add('bi-check-circle-fill', 'text-success');
+            } else if (type === 'error') {
+                toastHeader.classList.add('bi-exclamation-circle-fill', 'text-danger');
+            } else {
+                toastHeader.classList.add('bi-info-circle-fill', 'text-primary');
+            }
+            
+            new bootstrap.Toast(toast).show();
+        }
+        
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        function activateProject(projectName) {
+            fetch('/configuration/set-active-project/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ project_name: projectName })
+            })
+            .then(async response => {
+                if (!response.ok) {
+                    const text = await response.text();
+                    showToast('APIエラー: ' + text, 'error');
+                    throw new Error(text);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showToast('プロジェクトをアクティブ化しました', 'success');
+                    setTimeout(() => { location.reload(); }, 1000);
+                } else {
+                    showToast(data.error || 'アクティブ化に失敗しました', 'error');
+                }
+            })
+            .catch(error => {
+                showToast('エラーが発生しました: ' + error.message, 'error');
+            });
+        }
+    </script>
+</body>
+</html>

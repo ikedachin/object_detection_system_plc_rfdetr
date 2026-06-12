@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>プロジェクト選択とウエイトパス取得</title>
+</head>
+<body>
+    <h1>プロジェクト選択とウエイトパス取得</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">ウエイトパス取得</button>
+    </form>
+    {% if weight_path %}
+        <h2>ウエイトファイルパス</h2>
+        <p>{{ weight_path }}</p>
+    {% endif %}
+    {% if result_message %}
+        <h2>ウエイトファイル判定</h2>
+        <p id="weightResultMessage">{{ result_message }}</p>
+    {% endif %}
+</body>
+</html>
