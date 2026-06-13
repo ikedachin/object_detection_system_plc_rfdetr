@@ -1,9 +1,13 @@
 [project]
 name = "object-detection-system"
 version = "0.1.0"
-description = "Add your description here"
+description = "Django web application for RF-DETR based object detection workflows"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "ikedachin" },
+]
 dependencies = [
     "channels>=4.2.2",
     "daphne>=4.2.0",

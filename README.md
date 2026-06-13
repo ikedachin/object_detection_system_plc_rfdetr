@@ -1,7 +1,7 @@
-# 🚧 **under construction** 👷‍♀️
 # RF-DETRシステム
-rfdetr社のRF-DETRを**誰でも、簡単に**使えることを目的としたwebアプリです
-RF-DETRに関してはrfdetr社のライセンスに準じます。
+Roboflow社のRF-DETRを**誰でも、簡単に**使えることを目的としたwebアプリです。
+
+このリポジトリは、RF-DETRとAlbumentationsを利用して物体検出のデータ収集、アノテーション、学習、推論を行うためのWebアプリケーションです。RF-DETR本体やAlbumentations本体を再配布・改変するプロジェクトではありません。
 
 ![RF-DETRシステム画面](./assets/images/image.png)
 
@@ -15,7 +15,7 @@ RF-DETRに関してはrfdetr社のライセンスに準じます。
 - **自動画像キャプチャ**: 設定された時間間隔で自動的に画像をキャプチャして保存
 - **手動スナップショット**: ユーザーが必要なときに手動でスナップショットを撮影
 - **画像の切り取り**：学習データの写真を大きめの画像サイズで撮影し、切り取る位置を決めて全データに適用することができます。
-- **学習**：学習時のパラメータを簡単にセットすることができます。詳しくはrfdetr社のHPを見てください。
+- **学習**：RF-DETRの学習パラメータを画面から設定し、進捗・loss・metricsを確認できます。詳しくはRoboflow社のRF-DETR公式ドキュメントを確認してください。
 - **アイテム推論（検出）**: RF-DETRモデルを使用した箱内のアイテム推論（検出）
 - **PLC連携トリガー**: オムロンPLC（CJ2H）のメモリビットを監視し、ON検知時にチェッカーアプリのスナップショット処理を実行
 
@@ -27,7 +27,8 @@ RF-DETRに関してはrfdetr社のライセンスに準じます。
 - **Django**: ウェブアプリケーションフレームワーク
 - **Channels/Daphne**: WebSocketサポート用
 - **OpenCV**: カメラ制御と画像処理
-- **Roboflow RF-DETR**: 物体検出と分類
+- **Roboflow RF-DETR**: 物体検出モデル
+- **Albumentations**: 学習時の画像拡張
 - **pyfins**: オムロンPLCとのFINS/UDP通信
 
 ### フロントエンド
@@ -84,12 +85,12 @@ object_detection_system/
 │   ├── (db.sqlite3) # データベース
 │   ├── manage.py
 │   └── (Roboflow/rf-detr-large) # RF-DETRのウエイト
-├── design_docs/ # 設計書を入れておく予定（作成中）
+├── zzz_docs/ # 設計書・補足ドキュメント
 │   ├── project_folder_construction.md
 │   └── ...
 ├── pyproject.toml
 ├── README.md
-├── start.sh # ワンタッチ実行用のシェルスクリプト（作成中）
+├── start.sh # ワンタッチ実行用のシェルスクリプト
 ├── TASK_FOLDER_STRUCTURE.md
 ├── uv.lock
 ```
@@ -131,8 +132,8 @@ object_detection_system/
 - EXIF対応・セキュリティ対策
 - 切り抜き座標の一括管理・ダウンロード
 
-### 5. 学習管理アプリ (`training`) ※作成中
-RF-DETRモデルの学習・管理を行うアプリです（開発中）。
+### 5. 学習管理アプリ (`training`)
+RF-DETRモデルの学習・管理を行うアプリです。
 - 学習ジョブの管理・実行
 - 学習状況の可視化・履歴管理
 - モデルファイルの管理
@@ -168,7 +169,8 @@ Djangoプロジェクト本体の設定・ルーティング・ASGI/WGIエント
   - opencv-python >= 4.11.0.86
   - pip >= 25.1.1
   - pyyaml >= 6.0.2
-  - rfdetr >= 8.3.158
+  - rfdetr[train,loggers]
+  - albumentations（RF-DETRの学習拡張設定で利用）
   - uvicorn >= 0.30.0 (ダミーPLCサーバー用)
   あまりバージョンを気にしなくていいかもしれない
 
@@ -378,5 +380,13 @@ http://127.0.0.1:8010/
       http://localhost:8000
       ```
 ### License
-MITライセンスとして公開します。
-ただし、本プログラム内で利用しているRoboflow RF-DETRはAGPLv3ライセンスです。RF-DETRの使用に関しては、Roboflow社のライセンス条件に従ってください。
+Copyright 2026 ikedachin.
+
+このリポジトリに含まれるアプリケーションコードとドキュメントは Apache License 2.0 として公開します。
+
+ただし、このアプリケーションは外部ライブラリとしてRF-DETRとAlbumentationsを利用します。外部ライブラリ、モデル重み、追加コンポーネントには、それぞれの提供元が定めるライセンスが適用されます。
+
+- RF-DETR: Roboflow社のRF-DETRライセンス条件に従ってください。通常の `rfdetr` パッケージおよびApache指定モデルはApache 2.0、Plus系コンポーネントはRoboflow社が定める別ライセンスの対象です。
+- Albumentations: Albumentations本体はMIT Licenseです。後継のAlbumentationsXは別ライセンスのため、本リポジトリではAlbumentationsとAlbumentationsXを区別して扱ってください。
+
+詳細は [zzz_docs/licensing.md](zzz_docs/licensing.md) を参照してください。

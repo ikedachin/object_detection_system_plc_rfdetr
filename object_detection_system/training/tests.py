@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import torch
 from channels.layers import get_channel_layer
 from channels.testing import WebsocketCommunicator
 from django.conf import settings
@@ -10,7 +11,13 @@ from django.test import TestCase, override_settings
 
 from annotator.models import Project
 from object_detection_system.asgi import application
-from training.applications.rfdetr_train import _build_args, _send_final_metric_row, _send_new_metric_rows, run_rfdetr_training
+from training.applications.rfdetr_train import (
+    _build_args,
+    _patch_rfdetr_validation_loss_logging,
+    _send_final_metric_row,
+    _send_new_metric_rows,
+    run_rfdetr_training,
+)
 from training.applications.rfdetr_native import training_kwargs_from_args
 from training.models import TrainingRun
 
@@ -228,52 +235,102 @@ class RfdetrTrainingMetricsTests(TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             metrics_path = Path(tmp) / 'metrics.csv'
             metrics_path.write_text(
-                'epoch,train/loss_bbox,train/loss_ce,metrics/precision(B),ignored\n'
-                '1,0.123456,1.98765,0.81234,text\n'
-                '2,0.11111,1.87654,0.9,text\n',
+                'epoch,train/loss,train/loss_bbox,train/loss_ce,val/loss,val/loss_bbox,val/loss_ce,metrics/precision(B),ignored\n'
+                '0,,,,3.45678,0.65432,2.76543,0.81234,text\n'
+                '0,2.34567,0.123456,1.98765,,,,,text\n'
+                '1,,,,3.22222,0.54321,2.65432,0.9,text\n'
+                '1,2.11111,0.11111,1.87654,,,,,text\n',
                 encoding='utf-8',
             )
 
             with patch('training.applications.rfdetr_train._send_training_metrics') as mock_send:
                 sent_rows = _send_new_metric_rows(metrics_path, total_epochs=5)
 
-        self.assertEqual(sent_rows, 2)
+        self.assertEqual(sent_rows, 4)
         self.assertEqual(mock_send.call_count, 2)
         self.assertEqual(mock_send.call_args_list[0].args[0], 1)
         self.assertEqual(mock_send.call_args_list[0].args[1], 5)
         self.assertEqual(
             mock_send.call_args_list[0].args[2],
             {
+                'train/loss': 2.3457,
                 'train/loss_bbox': 0.1235,
                 'train/loss_ce': 1.9876,
+                'val/loss': 3.4568,
+                'val/loss_bbox': 0.6543,
+                'val/loss_ce': 2.7654,
                 'metrics/precision(B)': 0.8123,
             },
         )
+        self.assertEqual(mock_send.call_args_list[1].args[0], 2)
+        self.assertEqual(mock_send.call_args_list[1].args[2]['train/loss'], 2.1111)
+        self.assertEqual(mock_send.call_args_list[1].args[2]['val/loss'], 3.2222)
+
+    def test_rfdetr_validation_step_logs_validation_loss_components(self):
+        from rfdetr.training.module_model import RFDETRModelModule
+
+        _patch_rfdetr_validation_loss_logging()
+        module = type('FakeModule', (), {})()
+        module.train_config = type('TrainConfig', (), {'compute_val_loss': True})()
+        module.model = lambda samples: {'pred': torch.tensor(1.0)}
+        module.criterion = lambda outputs, targets: {
+            'loss_bbox': torch.tensor(0.5),
+            'loss_ce': torch.tensor(1.5),
+            'loss_giou': torch.tensor(0.25),
+        }
+        module.criterion.weight_dict = {
+            'loss_bbox': 5.0,
+            'loss_ce': 1.0,
+            'loss_giou': 2.0,
+        }
+        module.postprocess = lambda outputs, orig_sizes: [{'boxes': torch.empty((0, 4))}]
+        logged_dicts = []
+        logged_scalars = {}
+        module.log_dict = lambda values, **kwargs: logged_dicts.append(values)
+        module.log = lambda key, value, **kwargs: logged_scalars.update({key: value})
+
+        output = RFDETRModelModule.validation_step(
+            module,
+            (
+                object(),
+                [{'orig_size': torch.tensor([100, 100])}],
+            ),
+            0,
+        )
+
+        self.assertIn('val/loss_bbox', logged_dicts[0])
+        self.assertIn('val/loss_ce', logged_dicts[0])
+        self.assertIn('val/loss_giou', logged_dicts[0])
+        self.assertAlmostEqual(float(logged_scalars['val/loss']), 4.5)
+        self.assertIn('results', output)
 
     def test_metrics_csv_sender_skips_already_sent_rows(self):
         with tempfile.TemporaryDirectory() as tmp:
             metrics_path = Path(tmp) / 'metrics.csv'
             metrics_path.write_text(
-                'epoch,train/loss_bbox\n'
-                '1,0.2\n'
-                '2,0.1\n',
+                'epoch,train/loss_bbox,val/loss_bbox\n'
+                '0,0.2,\n'
+                '1,,0.3\n'
+                '1,0.1,\n',
                 encoding='utf-8',
             )
 
             with patch('training.applications.rfdetr_train._send_training_metrics') as mock_send:
                 sent_rows = _send_new_metric_rows(metrics_path, total_epochs=2, sent_rows=1)
 
-        self.assertEqual(sent_rows, 2)
+        self.assertEqual(sent_rows, 3)
         mock_send.assert_called_once()
         self.assertEqual(mock_send.call_args.args[0], 2)
+        self.assertEqual(mock_send.call_args.args[2], {'val/loss_bbox': 0.3, 'train/loss_bbox': 0.1})
 
     def test_final_metric_sender_forces_complete_epoch(self):
         with tempfile.TemporaryDirectory() as tmp:
             metrics_path = Path(tmp) / 'metrics.csv'
             metrics_path.write_text(
-                'epoch,train/loss_bbox,train/loss_ce,metrics/mAP50(B)\n'
-                '0,0.3,2.0,0.4\n'
-                '4,0.1,1.2,0.8\n',
+                'epoch,train/loss_bbox,train/loss_ce,val/loss_bbox,val/loss_ce,metrics/mAP50(B)\n'
+                '0,0.3,2.0,,,0.4\n'
+                '4,,,0.5,1.8,0.8\n'
+                '4,0.1,1.2,,,\n',
                 encoding='utf-8',
             )
 
@@ -288,6 +345,8 @@ class RfdetrTrainingMetricsTests(TestCase):
             {
                 'train/loss_bbox': 0.1,
                 'train/loss_ce': 1.2,
+                'val/loss_bbox': 0.5,
+                'val/loss_ce': 1.8,
                 'metrics/mAP50(B)': 0.8,
             },
         )

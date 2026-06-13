@@ -21,16 +21,16 @@ names:
   2: small  # 小さい物体
 ```
 これらのアノテーションラベル（`names`）、学習データ（`images/train`）によって学習します。
-`imges/valid`は学習用データとば別の性能検証用のデータです。
+`images/valid` は学習用データとは別の性能検証用データです。
 
 <br>
 
 ---
 
 ### 学習時パラメータ
-参考url：https://docs.rfdetr.com/ja/modes/train/
+参考url：https://rfdetr.roboflow.com/latest/learn/run/detection/
 
-RF-DETRの学習時に設定できる主なパラメータは以下の通りです。学習アプリで主要なものは画面から選択することができます。追加で設定する場合は、詳細設定ボタンを押してjson形式で記入してください。
+RF-DETRの学習時に設定できる主なパラメータは以下の通りです。学習アプリで主要なものは画面から選択できます。追加で設定する場合は、詳細設定ボタンを押してJSON形式で記入してください。
 
 
 
@@ -38,87 +38,67 @@ RF-DETRの学習時に設定できる主なパラメータは以下の通りで�
 
 | パラメータ | 説明 | 例 |
 |---|---|---|
-| model | 学習に使用するモデル | Roboflow/rf-detr-large |
-| data | データセット設定ファイル | data.yaml |
+| model_name | 学習に使用するRF-DETRモデル | Roboflow/rf-detr-large |
+| dataset_yaml | データセット設定ファイル | data.yaml |
 | epochs | 学習の繰り返し回数 | 100 |
-| batch | バッチサイズ | 16 |
-| imgsz | 入力画像サイズ | 640 |
-| name | 実験名（保存フォルダ名） | "exp1" |
-| lr0 | 初期学習率 | 0.01 |
-| lrf | 最終学習率係数 | 0.01 |
-| momentum | モーメンタム | 0.937 |
-| weight_decay | 重み減衰 | 0.0005 |
-| optimizer | 最適化手法（SGD, Adam, auto） | 'auto' |
-| dropout | ドロップアウト率 | 0.0 |
-| patience | EarlyStoppingのpatience | 50 |
-| device | 使用するデバイス（cpu/gpu） | 'cuda' |
-| workers | データローダーのワーカ数 | 8 |
-| project | 保存先ディレクトリ | "runs/train" |
-| exist_ok | 既存フォルダ上書き可否 | True |
-| pretrained | 事前学習済み重みの利用 | True |
-| resume | 学習再開 | False |
-| amp | 自動混合精度 | True |
-| freeze | 凍結するレイヤー数 | 0 |
-| rect | 画像を矩形で読み込む | False |
-| cache | データセットキャッシュ | False |
-| image_weights | 画像重み付け | False |
-| single_cls | 単一クラス学習 | False |
-| close_mosaic | Mosaic拡張の停止 | 0 |
+| batch_size | バッチサイズ | 16 |
+| resolution | 入力画像サイズ | 640 |
+| grad_accum_steps | 勾配蓄積ステップ数 | 4 |
+| accelerator | 実行アクセラレータ。auto/cpu/cuda/mpsなど | auto |
+| num_workers | データローダーのワーカ数 | 1 |
+| lr | 学習率 | 0.0001 |
+| lr_encoder | encoder側の学習率 | 0.00015 |
+| weight_decay | 重み減衰 | 0.0001 |
+| eval_interval | 検証を実行する間隔 | 1 |
+| compute_val_loss | validation lossを計算するか | true |
+| use_ema | EMAを使うか | true |
+| gradient_checkpointing | メモリ削減用のgradient checkpointing | false |
+| tensorboard | TensorBoardログを出力するか | false |
+| wandb | Weights & Biasesログを出力するか | false |
+| project | ロガー用プロジェクト名 | "runs/train" |
+| run | ロガー用実行名 | "exp1" |
+| resume | 学習再開用チェックポイント | checkpoint.pth |
+| pretrain_weights | 事前学習済み重み | checkpoint.pth |
+| checkpoint_interval | チェックポイント保存間隔 | 1 |
 | seed | 乱数シード | 0 |
-| deterministic | 完全再現性 | False |
-| val | 検証の有無 | True |
-| plots | 学習中の可視化 | True |
-| save | モデル保存 | True |
-| save_period | 保存周期 | -1 |
+| early_stopping | Early Stoppingを使うか | false |
+| early_stopping_patience | Early Stoppingのpatience | 10 |
+| early_stopping_min_delta | Early Stoppingの最小改善量 | 0.001 |
+| aug_config | Albumentations形式の拡張設定 | {"HorizontalFlip": {"p": 0.5}} |
+| num_queries | DETR query数 | 300 |
+| num_select | 推論時に選択する候補数 | 300 |
+| pin_memory | DataLoaderのpin_memory | true |
+| persistent_workers | DataLoader workerを保持するか | false |
+| prefetch_factor | DataLoaderのprefetch数 | 2 |
+| progress_bar | 進捗表示方式 | rich |
 
-
-
-
-詳細は公式ドキュメント（https://docs.rfdetr.com/ja/modes/train/）を参照してください。
+詳細は公式ドキュメント（https://rfdetr.roboflow.com/latest/learn/run/detection/）を参照してください。
 
 
 
 - **オーグメンテーション（Augmentation）**
 
-RF-DETRでは学習時に画像の拡張（オーグメンテーション）を自動で行い、汎化性能を高めます。主なオーグメンテーションは以下の通りです。
-
-| オーグメンテーション | 説明 |
+本アプリではRF-DETRの `aug_config` にAlbumentations形式のJSONを渡せます。空欄はRF-DETR標準、`{}` は拡張なしです。`p` を0より大きくすると、その変換が有効になります。
 
 | オーグメンテーション | 説明 |
 |---|---|
-| mosaic | 複数画像の合成（Mosaic augmentation） |
-| mixup | 画像のMixUp合成（MixUp augmentation） |
-| copy_paste | 物体のコピー＆ペースト（Copy-Paste augmentation） |
-| hsv | 色相・彩度・明度の変化（HSV augmentation） |
-| flip | 画像の左右反転（Horizontal flip） |
-| scale | 画像の拡大・縮小（Scaling） |
-| translate | 画像の平行移動（Translation） |
-| shear | 画像の斜め変形（Shearing） |
-| perspective | 画像の遠近変換（Perspective transformation） |
-| rotate | 画像の回転（Rotation） |
-| pad | 画像のパディング（Padding） |
-| blur | 画像のぼかし（Blurring） |
-| gaussian | ガウシアンノイズ付加（Gaussian noise） |
-| grayscale | グレースケール変換（Grayscale） |
-| color_jitter | 色調・コントラスト・明度のランダム変化（Color jitter） |
-| random_crop | ランダムクロップ（Random crop） |
-| cutout | ランダム領域マスク（Cutout） |
-| clahe | コントラスト制限付きヒストグラム平坦化（CLAHE） |
-| channel_shuffle | チャンネルシャッフル（Channel shuffle） |
-| sharpen | シャープ化（Sharpen） |
-| emboss | エンボス加工（Emboss） |
-| brightness | 明度変化（Brightness） |
-| contrast | コントラスト変化（Contrast） |
-| saturation | 彩度変化（Saturation） |
-| exposure | 露光変化（Exposure） |
+| HorizontalFlip | 左右反転 |
+| VerticalFlip | 上下反転 |
+| Rotate | 回転 |
+| Affine | 拡大縮小、平行移動、回転、せん断 |
+| ShiftScaleRotate | 平行移動、拡大縮小、回転 |
+| RandomCrop / CenterCrop / RandomResizedCrop | クロップ |
+| Perspective | 遠近変換 |
+| ElasticTransform / GridDistortion | 形状変形 |
+| ColorJitter / HueSaturationValue / RandomBrightnessContrast | 色、明度、コントラスト調整 |
+| GaussianBlur / Blur / GaussNoise | ぼかし、ノイズ |
+| CLAHE / Sharpen / Equalize | コントラスト補正、シャープ化、ヒストグラム平坦化 |
 
-（一部はバージョンや設定により有効/無効が異なります。詳細は公式ドキュメントを参照してください）
+Albumentations本体はMIT Licenseです。後継のAlbumentationsXは別ライセンスのため、導入するライブラリ名とライセンスを区別してください。
 
 
 
 詳細なパラメータやカスタマイズ方法は公式ドキュメントを参照してください。
 
 ---
-
-
 

@@ -24,7 +24,7 @@ image_size:
 #### 他に利用できる推論用の引数の設定（上級者向け）
 これらを上記の`settings.rfdetr_detect.yaml`に追記していただくことも可能です。
 
-参照url: https://docs.rfdetr.com/ja/modes/predict/#inference-sources
+参照url: https://rfdetr.roboflow.com/latest/
 
 - **推論引数:**
 
@@ -68,5 +68,4 @@ image_size:
 | show_conf | bool | True | 各検出の信頼スコアがラベルと一緒に表示。 |
 | show_boxes | bool | True | 検出されたオブジェクトの周囲にバウンディングボックスを描画。 |
 | line_width | None or int | None | バウンディングボックスの線幅を指定。 | 
-
 

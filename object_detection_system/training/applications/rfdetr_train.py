@@ -90,6 +90,41 @@ def _row_epoch(row, fallback_epoch):
     return fallback_epoch
 
 
+def _explicit_row_epoch(row):
+    for key in ("epoch", "Epoch", "epochs"):
+        value = row.get(key)
+        if value not in (None, ""):
+            try:
+                return int(float(value))
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
+def _display_epoch(row, fallback_epoch, total_epochs):
+    raw_epoch = _explicit_row_epoch(row)
+    if raw_epoch is None:
+        return min(fallback_epoch, total_epochs)
+    if 0 <= raw_epoch < total_epochs:
+        return raw_epoch + 1
+    return min(raw_epoch, total_epochs)
+
+
+def _merge_metric_rows_by_epoch(rows, total_epochs):
+    merged = {}
+    order = []
+    for index, row in enumerate(rows, start=1):
+        metrics = _format_training_metrics(row)
+        if not metrics:
+            continue
+        epoch = _display_epoch(row, index, total_epochs)
+        if epoch not in merged:
+            merged[epoch] = {}
+            order.append(epoch)
+        merged[epoch].update(metrics)
+    return [(epoch, merged[epoch]) for epoch in order]
+
+
 def _send_training_metrics(epoch, total_epochs, metrics, status="running"):
     channel_layer = get_channel_layer()
     if not channel_layer:
@@ -123,18 +158,20 @@ def _send_new_metric_rows(metrics_path, total_epochs, sent_rows=0):
             rows = list(csv.DictReader(f))
     except (OSError, csv.Error):
         return sent_rows
-    for index, row in enumerate(rows[sent_rows:], start=sent_rows + 1):
-        metrics = _format_training_metrics(row)
-        if not metrics:
-            continue
-        epoch = _row_epoch(row, index)
-        _send_training_metrics(epoch, total_epochs, metrics)
+    changed_epochs = {
+        _display_epoch(row, index, total_epochs)
+        for index, row in enumerate(rows[sent_rows:], start=sent_rows + 1)
+        if _format_training_metrics(row)
+    }
+    for epoch, metrics in _merge_metric_rows_by_epoch(rows, total_epochs):
+        if epoch in changed_epochs:
+            _send_training_metrics(epoch, total_epochs, metrics)
     return len(rows)
 
 
 def _send_final_metric_row(output_dir, total_epochs, wait_attempts=10, wait_seconds=0.5):
     metrics_path = Path(output_dir) / "metrics.csv"
-    latest_row = None
+    rows = []
     for _ in range(wait_attempts):
         if metrics_path.exists():
             try:
@@ -143,13 +180,13 @@ def _send_final_metric_row(output_dir, total_epochs, wait_attempts=10, wait_seco
             except (OSError, csv.Error):
                 rows = []
             if rows:
-                latest_row = rows[-1]
-                row_epoch = _row_epoch(latest_row, len(rows))
-                if row_epoch >= total_epochs or len(rows) >= total_epochs:
+                final_epoch = _display_epoch(rows[-1], len(rows), total_epochs)
+                if final_epoch >= total_epochs or len(rows) >= total_epochs:
                     break
         threading.Event().wait(wait_seconds)
 
-    metrics = _format_training_metrics(latest_row or {})
+    merged_points = _merge_metric_rows_by_epoch(rows, total_epochs)
+    metrics = merged_points[-1][1] if merged_points else {}
     _send_training_metrics(total_epochs, total_epochs, metrics, status="complete")
 
 
@@ -166,6 +203,37 @@ def _configure_training_cache_dirs():
     xdg_cache.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
     os.environ.setdefault("XDG_CACHE_HOME", str(xdg_cache))
+
+
+def _patch_rfdetr_validation_loss_logging():
+    from rfdetr.training.module_model import RFDETRModelModule
+    import torch
+
+    if getattr(RFDETRModelModule, "_object_detection_system_val_loss_patch", False):
+        return
+
+    def validation_step(self, batch, batch_idx):
+        samples, targets = batch
+        outputs = self.model(samples)
+        if self.train_config.compute_val_loss:
+            loss_dict = self.criterion(outputs, targets)
+            weight_dict = self.criterion.weight_dict
+            loss = sum(loss_dict[k] * weight_dict[k] for k in loss_dict if k in weight_dict)
+            batch_size = len(targets)
+            self.log_dict(
+                {f"val/{k}": v for k, v in loss_dict.items()},
+                on_epoch=True,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
+            self.log("val/loss", loss, prog_bar=True, on_epoch=True, sync_dist=True, batch_size=batch_size)
+
+        orig_sizes = torch.stack([t["orig_size"] for t in targets])
+        results = self.postprocess(outputs, orig_sizes)
+        return {"results": results, "targets": targets}
+
+    RFDETRModelModule.validation_step = validation_step
+    RFDETRModelModule._object_detection_system_val_loss_patch = True
 
 
 def _build_args(model_name, dataset_root, class_names, epochs, resolution, batch_size, output_dir, other_params):
@@ -268,6 +336,8 @@ def run_rfdetr_training(model_name, data_yaml, epochs, resolution, batch_size, d
     if args.extra_params:
         unknown = ", ".join(sorted(args.extra_params.keys()))
         raise ValueError(f"RF-DETR training parameters are unsupported: {unknown}")
+
+    _patch_rfdetr_validation_loss_logging()
 
     args.dataset_dir = prepare_rfdetr_dataset(
         coco_dir=args.coco_dir,

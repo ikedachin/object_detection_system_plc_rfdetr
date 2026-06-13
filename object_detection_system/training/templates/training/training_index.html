@@ -132,6 +132,15 @@
             font-size: 1.15rem;
             display: inline-block;
         }
+        .aug-config-field {
+            width: 100%;
+            max-width: none;
+            min-width: 0;
+            font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.95rem;
+            white-space: pre;
+            overflow-x: auto;
+        }
         .form-row-flex {
             display: flex;
             align-items: center;
@@ -408,8 +417,8 @@
       <div class="param-grid">
         <label for="accelerator" class="form-label">アクセラレータ (accelerator)</label>
         <select class="form-select" id="accelerator" name="accelerator">
-          <option value="auto">auto</option>
-          <option value="cpu" selected>cpu</option>
+          <option value="auto" selected>auto</option>
+          <option value="cpu">cpu</option>
           <option value="cuda">cuda</option>
           <option value="mps">mps</option>
         </select>
@@ -418,8 +427,29 @@
       </div>
       <div class="mb-3">
         <label for="aug_config" class="form-label">拡張設定 (aug_config JSON)</label>
-        <textarea class="form-control" id="aug_config" name="aug_config" rows="4">{"HorizontalFlip": {"p": 0.5}}</textarea>
-        <div class="form-text">空欄はRF-DETR標準、{}は拡張なしです。</div>
+        <textarea class="form-control aug-config-field" id="aug_config" name="aug_config" rows="5">{
+  "HorizontalFlip": {"p": 0.5},
+  "VerticalFlip": {"p": 0.0},
+  "Rotate": {"limit": 10, "p": 0.0},
+  "Affine": {"scale": [0.95, 1.05], "translate_percent": [-0.03, 0.03], "rotate": [-5, 5], "shear": [-3, 3], "p": 0.0},
+  "ShiftScaleRotate": {"shift_limit": 0.03, "scale_limit": 0.05, "rotate_limit": 10, "p": 0.0},
+  "RandomCrop": {"height": 640, "width": 640, "pad_if_needed": true, "p": 0.0},
+  "CenterCrop": {"height": 640, "width": 640, "pad_if_needed": true, "p": 0.0},
+  "RandomResizedCrop": {"size": [640, 640], "scale": [0.9, 1.0], "ratio": [0.9, 1.1], "p": 0.0},
+  "Perspective": {"scale": [0.01, 0.03], "keep_size": true, "p": 0.0},
+  "ElasticTransform": {"alpha": 0.5, "sigma": 30.0, "p": 0.0},
+  "GridDistortion": {"num_steps": 5, "distort_limit": 0.05, "p": 0.0},
+  "ColorJitter": {"brightness": 0.1, "contrast": 0.1, "saturation": 0.1, "hue": 0.05, "p": 0.0},
+  "HueSaturationValue": {"hue_shift_limit": 5, "sat_shift_limit": 10, "val_shift_limit": 5, "p": 0.0},
+  "RandomBrightnessContrast": {"brightness_limit": 0.1, "contrast_limit": 0.1, "p": 0.0},
+  "GaussianBlur": {"blur_limit": 3, "p": 0.0},
+  "GaussNoise": {"std_range": [0.01, 0.05], "p": 0.0},
+  "Blur": {"blur_limit": 3, "p": 0.0},
+  "CLAHE": {"clip_limit": 2.0, "tile_grid_size": [8, 8], "p": 0.0},
+  "Sharpen": {"alpha": [0.2, 0.5], "lightness": [0.5, 1.0], "p": 0.0},
+  "Equalize": {"mode": "cv", "by_channels": true, "p": 0.0}
+}</textarea>
+        <div class="form-text">空欄はRF-DETR標準、{}は拡張なしです。pを0より大きくすると有効化されます。</div>
       </div>
       <!-- エポック数説明モーダル -->
       <div class="modal fade" id="epochsInfoModal" tabindex="-1" aria-labelledby="epochsInfoModalLabel" aria-hidden="true">
@@ -515,7 +545,7 @@
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-              RF-DETRのPyTorch Lightning acceleratorです。Macではmpsで未対応演算に当たる場合があるため、既定はcpuにしています。
+              RF-DETRのPyTorch Lightning acceleratorです。autoでは実行環境に応じて自動選択します。
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
@@ -536,12 +566,20 @@
             <strong>学習進捗</strong>
             <div class="text-muted small">学習が終わるまでストップすることはできません。</div>
           </div>
-          <div id="epochLabel" class="fw-bold">Epoch: 0 / 0</div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleMetricCardsBtn" aria-expanded="false">数値を表示</button>
+            <div id="epochLabel" class="fw-bold">Epoch: 0 / 0</div>
+          </div>
         </div>
         <div class="progress training-progress-bar mb-3" role="progressbar" aria-label="学習進捗" aria-valuemin="0" aria-valuemax="100">
           <div id="epochProgressBar" class="progress-bar" style="width: 0%;">0%</div>
         </div>
         <div id="metricsCards" class="training-metrics-grid mb-3"></div>
+        <div class="training-chart-wrap">
+          <div class="training-chart-title">total loss / train vs valid</div>
+          <canvas id="totalLossChart" class="training-chart" width="900" height="280"></canvas>
+          <div id="totalLossLegend" class="training-chart-legend mt-2"></div>
+        </div>
         <div class="training-chart-wrap">
           <div class="training-chart-title">box loss</div>
           <canvas id="boxLossChart" class="training-chart" width="900" height="280"></canvas>
@@ -596,7 +634,7 @@
       document.getElementById('num_workers').value = 1;
     });
     document.getElementById('resetAccelerator').addEventListener('click', function() {
-      document.getElementById('accelerator').value = 'cpu';
+      document.getElementById('accelerator').value = 'auto';
     });
     const yamlSelect = document.getElementById('dataset_yaml');
 
@@ -644,10 +682,26 @@
     const epochLabel = document.getElementById('epochLabel');
     const epochProgressBar = document.getElementById('epochProgressBar');
     const metricsCards = document.getElementById('metricsCards');
+    const toggleMetricCardsBtn = document.getElementById('toggleMetricCardsBtn');
     const metricsHistory = [];
-    const chartColors = ['#2e7d32', '#1565c0', '#c62828', '#ef6c00', '#6a1b9a', '#00838f'];
-    const preferredMetricWords = ['box_loss', 'loss_bbox', 'cls_loss', 'class_loss', 'loss_ce', 'dfl_loss', 'loss_giou', 'precision', 'recall', 'map'];
+    let metricCardsVisible = false;
+    const trainChartColors = ['#1565c0', '#1e88e5', '#42a5f5', '#0d47a1', '#64b5f6', '#1976d2'];
+    const validChartColors = ['#c62828', '#e53935', '#ef5350', '#8e0000', '#ff7043', '#b71c1c'];
+    const neutralChartColors = ['#2e7d32', '#6a1b9a', '#00838f', '#ef6c00', '#455a64', '#7b1fa2'];
+    const preferredMetricWords = ['train/loss', 'val/loss', 'box_loss', 'loss_bbox', 'cls_loss', 'class_loss', 'loss_ce', 'dfl_loss', 'loss_giou', 'precision', 'recall', 'map'];
     const chartConfigs = [
+      {
+        canvas: document.getElementById('totalLossChart'),
+        legend: document.getElementById('totalLossLegend'),
+        axisLabel: 'total loss',
+        emptyText: 'train/loss または val/loss を受信するとグラフを表示します。',
+        axisSide: 'left',
+        matches: key => {
+          const normalized = normalizeMetricKey(key);
+          return normalized === 'train/loss' || normalized === 'val/loss' || normalized === 'train_loss' || normalized === 'val_loss';
+        },
+        rank: key => normalizeMetricKey(key).startsWith('train') ? 0 : 1,
+      },
       {
         canvas: document.getElementById('boxLossChart'),
         legend: document.getElementById('boxLossLegend'),
@@ -658,7 +712,12 @@
           const normalized = normalizeMetricKey(key);
           return normalized.includes('box_loss') || normalized.includes('loss_bbox') || normalized.endsWith('bbox');
         },
-        rank: key => normalizeMetricKey(key).startsWith('train/') ? 0 : 1,
+        rank: key => {
+          const normalized = normalizeMetricKey(key);
+          if (normalized.startsWith('train/')) return 0;
+          if (normalized.startsWith('val/')) return 1;
+          return 2;
+        },
       },
       {
         canvas: document.getElementById('clsLossChart'),
@@ -670,7 +729,12 @@
           const normalized = normalizeMetricKey(key);
           return normalized.includes('cls_loss') || normalized.includes('class_loss') || normalized.includes('loss_ce');
         },
-        rank: key => normalizeMetricKey(key).startsWith('train/') ? 0 : 1,
+        rank: key => {
+          const normalized = normalizeMetricKey(key);
+          if (normalized.startsWith('train/')) return 0;
+          if (normalized.startsWith('val/')) return 1;
+          return 2;
+        },
       },
       {
         canvas: document.getElementById('dflLossChart'),
@@ -682,7 +746,12 @@
           const normalized = normalizeMetricKey(key);
           return normalized.includes('dfl_loss') || normalized.includes('loss_giou') || normalized.endsWith('giou');
         },
-        rank: key => normalizeMetricKey(key).startsWith('train/') ? 0 : 1,
+        rank: key => {
+          const normalized = normalizeMetricKey(key);
+          if (normalized.startsWith('train/')) return 0;
+          if (normalized.startsWith('val/')) return 1;
+          return 2;
+        },
       },
       {
         canvas: document.getElementById('metricsChart'),
@@ -721,6 +790,7 @@
       if (metricsCards) {
         metricsCards.innerHTML = '';
       }
+      applyMetricCardsVisibility();
       chartConfigs.forEach(config => {
         if (config.legend) {
           config.legend.innerHTML = '';
@@ -761,6 +831,24 @@
       return index === -1 ? preferredMetricWords.length : index;
     }
 
+    function applyMetricCardsVisibility() {
+      if (metricsCards) {
+        metricsCards.classList.toggle('d-none', !metricCardsVisible);
+      }
+      if (toggleMetricCardsBtn) {
+        toggleMetricCardsBtn.textContent = metricCardsVisible ? '数値を非表示' : '数値を表示';
+        toggleMetricCardsBtn.setAttribute('aria-expanded', String(metricCardsVisible));
+      }
+    }
+
+    if (toggleMetricCardsBtn) {
+      toggleMetricCardsBtn.addEventListener('click', () => {
+        metricCardsVisible = !metricCardsVisible;
+        applyMetricCardsVisibility();
+      });
+      applyMetricCardsVisibility();
+    }
+
     function getChartScale(metricKeys) {
       const values = [];
       metricKeys.forEach(key => {
@@ -795,6 +883,30 @@
       return Array.from(keySet)
         .sort((a, b) => config.rank(a) - config.rank(b) || a.localeCompare(b))
         .slice(0, 6);
+    }
+
+    function metricColorIndex(key, fallbackIndex) {
+      const normalized = normalizeMetricKey(key);
+      const suffixMatch = normalized.match(/_(\d+)$/);
+      if (suffixMatch) {
+        return Number(suffixMatch[1]) + 1;
+      }
+      if (normalized.includes('_enc')) {
+        return 4;
+      }
+      return fallbackIndex;
+    }
+
+    function getMetricColor(key, fallbackIndex) {
+      const normalized = normalizeMetricKey(key);
+      const colorIndex = metricColorIndex(key, fallbackIndex);
+      if (normalized.startsWith('train/') || normalized.startsWith('train_')) {
+        return trainChartColors[colorIndex % trainChartColors.length];
+      }
+      if (normalized.startsWith('val/') || normalized.startsWith('val_') || normalized.startsWith('valid/') || normalized.startsWith('valid_')) {
+        return validChartColors[colorIndex % validChartColors.length];
+      }
+      return neutralChartColors[fallbackIndex % neutralChartColors.length];
     }
 
     function updateProgressDisplay(epoch, totalEpochs) {
@@ -909,7 +1021,7 @@
       ctx.textAlign = 'left';
 
       metricKeys.forEach((key, index) => {
-        const color = chartColors[index % chartColors.length];
+        const color = getMetricColor(key, index);
         ctx.strokeStyle = color;
         ctx.fillStyle = color;
         ctx.lineWidth = 2;
@@ -946,7 +1058,7 @@
       if (config.legend) {
         config.legend.innerHTML = metricKeys.map((key, index) => `
           <span class="training-legend-item">
-            <span class="training-legend-color" style="background:${chartColors[index % chartColors.length]}"></span>
+            <span class="training-legend-color" style="background:${getMetricColor(key, index)}"></span>
             ${escapeHtml(key)}
           </span>
         `).join('');
@@ -962,7 +1074,13 @@
       }
       updateProgressDisplay(epoch, totalEpochs);
       updateMetricCards(metrics);
-      metricsHistory.push({ epoch, metrics });
+      const existingPoint = metricsHistory.find(point => point.epoch === epoch);
+      if (existingPoint) {
+        existingPoint.metrics = { ...existingPoint.metrics, ...metrics };
+      } else {
+        metricsHistory.push({ epoch, metrics });
+        metricsHistory.sort((a, b) => a.epoch - b.epoch);
+      }
       drawTrainingCharts();
     }
 
