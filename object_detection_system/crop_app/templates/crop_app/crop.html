@@ -9,8 +9,9 @@
     <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.css' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon.png' %}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/cropperjs@1.5.12/dist/cropper.css" onerror="console.warn('Cropper.js フォールバックCSS読み込み失敗')">
+    <link rel="stylesheet" href="{% static 'libs/cropper/cropper.min.css' %}">
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css"> -->
+    <!-- <link rel="stylesheet" href="https://unpkg.com/cropperjs@1.5.12/dist/cropper.css" onerror="console.warn('Cropper.js フォールバックCSS読み込み失敗')"> -->
     <style>
         /* 優しい赤系のカラーパレット */
         :root {
@@ -526,10 +527,11 @@
     {% csrf_token %}
     <input type="hidden" id="process-crop-url" value="{% url 'process_crop' %}">
     <input type="hidden" id="image-id" value="{{ image_id }}">
+    <script src="{% static 'libs/cropper/cropper.min.js' %}"></script>
 
-    <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script> -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script> -->
     
     <!-- Cropper.js 読み込み確認と強化されたフォールバック -->
     <script>
