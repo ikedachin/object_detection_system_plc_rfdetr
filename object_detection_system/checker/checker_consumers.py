@@ -3,6 +3,7 @@ import asyncio
 import datetime
 import json
 
+from asgiref.sync import sync_to_async
 from channels.layers import get_channel_layer
 from channels.generic.websocket import AsyncWebsocketConsumer
 from checker.applications.snap_service import (
@@ -74,11 +75,24 @@ class Confirm(AsyncWebsocketConsumer):
 
         try:
             snap_result = await run_snap_backend()
+            from checker.applications.plc_monitor import write_snap_result_signals
+
+            try:
+                await sync_to_async(write_snap_result_signals, thread_sensitive=False)(snap_result)
+            except Exception:
+                import traceback
+                traceback.print_exc()
             await self.send(bytes_data=snap_result.image_bytes)
             await self.send(text_data=snap_result_to_json(snap_result))
         except Exception as e:
             import traceback
+            from checker.applications.plc_monitor import write_snap_error_signals
+
             traceback.print_exc()
+            try:
+                await sync_to_async(write_snap_error_signals, thread_sensitive=False)()
+            except Exception:
+                traceback.print_exc()
             await self.send(text_data=json.dumps({
                 'error': str(e),
                 'timestamp': NOW.isoformat()

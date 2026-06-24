@@ -42,7 +42,9 @@ def checker_index(request):
     active_project_id = None
     active_config_filename = None
     config_files = []
-    
+    initial_model_load_training_id = None
+    initial_model_load_pending = False
+
     try:
         if active_project:
             # アクティブプロジェクトの学習一覧を取得
@@ -62,22 +64,14 @@ def checker_index(request):
                 # 設定ファイルから設定ファイル名を取得
                 active_config_filename = os.path.basename(active_training.config_yaml_path) if active_training.config_yaml_path else ""
                 models_path = resolve_project_root_path(active_training.saved_model_path)
-                
-                # グローバル変数のモデル状態をチェック
+
                 global model, model_loaded_training_id, model_loading
-                
+
                 if models_path.exists():
-                    # 既に同じモデルがロードされているかチェック
-                    if model is None or model_loaded_training_id != active_training.id:
-                        print(f"Loading model from: {active_training.saved_model_path}")
-                        try:
-                            model = load_model_for_training_run(active_training)
-                            model_loaded_training_id = active_training.id
-                            print(f"Model loaded successfully for training: {active_training.training_name}")
-                        except Exception as e:
-                            print(f"Error loading model: {e}")
-                            model = None
-                            model_loaded_training_id = None
+                    initial_model_load_training_id = active_training.id
+                    initial_model_load_pending = model_loading or model is None or model_loaded_training_id != active_training.id
+                    if initial_model_load_pending:
+                        print(f"Model will be loaded asynchronously: {active_training.training_name}")
                     else:
                         print(f"Model already loaded for training: {active_training.training_name}")
                 else:
@@ -106,6 +100,9 @@ def checker_index(request):
         'selected_project': selected_project,
         'active_project_id': active_project_id,
         'active_config_filename': active_config_filename,
+        'initial_model_load_training_id': initial_model_load_training_id,
+        'initial_model_load_pending': initial_model_load_pending,
+        'model_loading': model_loading,
         'result_message': None if 'result_message' not in locals() else result_message,
     })
 
@@ -395,4 +392,16 @@ def reset_plc_result_signals(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+def latest_plc_result(request):
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'error': 'GETリクエストが必要です'})
+
+    from checker.applications.plc_monitor import get_latest_plc_result
+
+    return JsonResponse({
+        'success': True,
+        'result': get_latest_plc_result(),
+    })
 

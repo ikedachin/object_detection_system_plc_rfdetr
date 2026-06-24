@@ -80,26 +80,92 @@ let numValue = "";
 // Websocket for Clock
 //////////////////////////////////////////////
 const clock_url = `ws://${window.location.host}/checker/ws/time/`;
-const ws_clock = new WebSocket(clock_url);
-window.ws_clock = ws_clock;
+let ws_clock = null;
+let clockReconnectTimer = null;
+let lastRenderedPlcResultTimestamp = null;
 
 console.log("WebSocket for clock:", clock_url);
 
-ws_clock.onmessage = function(event) {
+function handlePlcStatus(data) {
+  if (data.timestamp && data.timestamp === lastRenderedPlcResultTimestamp) {
+    return;
+  }
+  if (data.timestamp) {
+    lastRenderedPlcResultTimestamp = data.timestamp;
+  }
+
+  if (data.status === 'error') {
+    showErrorResult(data.error || 'PLCトリガーによる判定に失敗しました');
+  } else if (data.status === 'completed') {
+    renderDetectedImageFromDataUrl(data.image_data_url);
+    renderDetectionResult(data);
+  }
+}
+
+function connectClockWebSocket() {
+  if (ws_clock && (ws_clock.readyState === WebSocket.OPEN || ws_clock.readyState === WebSocket.CONNECTING)) {
+    return ws_clock;
+  }
+
+  ws_clock = new WebSocket(clock_url);
+  const socket = ws_clock;
+  window.ws_clock = ws_clock;
+
+  socket.onmessage = function(event) {
   const data = JSON.parse(event.data);
   if (data.type === 'plc_status') {
-    if (data.status === 'error') {
-      showErrorResult(data.error || 'PLCトリガーによる判定に失敗しました');
-    } else if (data.status === 'completed') {
-      renderDetectedImageFromDataUrl(data.image_data_url);
-      renderDetectionResult(data);
-    }
+    handlePlcStatus(data);
     return;
   }
   // console.log(data);
   let miniClock = document.getElementById('miniClock');
   document.getElementById('miniClock').textContent = data.now_time;
-};
+  };
+
+  socket.onclose = function(event) {
+    if (window.ws_clock === socket) {
+      window.ws_clock = null;
+      ws_clock = null;
+    }
+    if (!document.hidden && event.code !== 1000 && event.code !== 1001) {
+      scheduleClockReconnect();
+    }
+  };
+
+  socket.onerror = function(error) {
+    console.error("Clock WebSocket error:", error);
+  };
+
+  return ws_clock;
+}
+
+function scheduleClockReconnect() {
+  if (clockReconnectTimer) {
+    return;
+  }
+  clockReconnectTimer = setTimeout(() => {
+    clockReconnectTimer = null;
+    connectClockWebSocket();
+  }, 1000);
+}
+
+function fetchLatestPlcResult() {
+  fetch('/checker/api/latest_plc_result/')
+    .then(response => response.json())
+    .then(data => {
+      if (!data.success) {
+        throw new Error(data.error || '最新PLC判定結果の取得に失敗しました');
+      }
+      if (data.result && data.result.type === 'plc_status') {
+        handlePlcStatus(data.result);
+      }
+    })
+    .catch(error => {
+      console.error("Latest PLC result fetch error:", error);
+    });
+}
+
+connectClockWebSocket();
 
 // ページ離脱時にWSを閉じてサーバ側disconnectを確実に発火させる
 function cleanupCheckerSockets() {
@@ -109,12 +175,16 @@ function cleanupCheckerSockets() {
     }
   } catch (e) {}
   window.ws_clock = null;
+  ws_clock = null;
 }
 
 window.addEventListener('pagehide', cleanupCheckerSockets);
 window.addEventListener('beforeunload', cleanupCheckerSockets);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) cleanupCheckerSockets();
+  if (!document.hidden) {
+    connectClockWebSocket();
+    fetchLatestPlcResult();
+  }
 });
 
 //////////////////////////////////////////////

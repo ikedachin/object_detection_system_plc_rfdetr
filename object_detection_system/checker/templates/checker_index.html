@@ -292,8 +292,11 @@
     const projectSelect = document.getElementById('projectSelect');
     const trainingSelect = document.getElementById('trainingSelect');
     const selectedProjectName = document.getElementById('selectedProjectName');
-    const trainingInfo = document.getElementById('trainingInfo');
-    const projectSelectBtn = document.getElementById('projectSelectBtn');
+	    const trainingInfo = document.getElementById('trainingInfo');
+	    const projectSelectBtn = document.getElementById('projectSelectBtn');
+	    const initialModelLoadTrainingId = {% if initial_model_load_training_id %}{{ initial_model_load_training_id }}{% else %}null{% endif %};
+	    const initialModelLoadPending = {% if initial_model_load_pending %}true{% else %}false{% endif %};
+	    const initialModelAlreadyLoading = {% if model_loading %}true{% else %}false{% endif %};
     
     // プロジェクト選択時の表示更新
     if (projectSelect) {
@@ -381,8 +384,8 @@
     }
     
     // モデルをロードする関数
-    function loadModel(trainingId) {
-      fetch('/checker/api/load_model/', {
+	    function loadModel(trainingId, options = {}) {
+	      fetch('/checker/api/load_model/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -394,10 +397,10 @@
       })
       .then(response => response.json())
       .then(data => {
-        if (data.success) {
-          console.log('モデルロード開始:', data.message);
-          // ロード状況を定期的にチェック
-          checkModelLoadingStatus();
+	        if (data.success) {
+	          console.log('モデルロード開始:', data.message);
+	          // ロード状況を定期的にチェック
+	          checkModelLoadingStatus(options);
         } else {
           const loadingModal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
           loadingModal.hide();
@@ -413,8 +416,9 @@
     }
     
     // モデルロード状況をチェックする関数
-    function checkModelLoadingStatus() {
-      const checkInterval = setInterval(() => {
+	    function checkModelLoadingStatus(options = {}) {
+	      const reloadOnComplete = options.reloadOnComplete !== false;
+	      const checkInterval = setInterval(() => {
         fetch('/checker/api/check_model_status/')
         .then(response => response.json())
         .then(data => {
@@ -431,12 +435,14 @@
               <p class="text-muted">${data.message}</p>
             `;
             
-            // 1秒後にモーダルを閉じてページをリロード
-            setTimeout(() => {
-              const loadingModal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
-              loadingModal.hide();
-              location.reload();
-            }, 1500);
+	            // 1秒後にモーダルを閉じる。モデル切替時は表示情報更新のためリロードする。
+	            setTimeout(() => {
+	              const loadingModal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
+	              loadingModal.hide();
+	              if (reloadOnComplete) {
+	                location.reload();
+	              }
+	            }, 1500);
             
           } else if (data.status === 'loading') {
             // ロード中
@@ -467,10 +473,27 @@
           const loadingModal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
           loadingModal.hide();
         });
-      }, 1000); // 1秒ごとにチェック
-    }
-    
-    // 判定結果の色分け（正常/異常）
+	      }, 1000); // 1秒ごとにチェック
+	    }
+
+	    function showInitialModelLoadingIfNeeded() {
+	      if (!initialModelLoadPending || !initialModelLoadTrainingId) {
+	        return;
+	      }
+
+	      const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+	      loadingModal.show();
+
+	      if (initialModelAlreadyLoading) {
+	        checkModelLoadingStatus();
+	      } else {
+	        loadModel(initialModelLoadTrainingId);
+	      }
+	    }
+
+	    showInitialModelLoadingIfNeeded();
+
+	    // 判定結果の色分け（正常/異常）
     const detectedResult = document.getElementById('detectedResult');
     if (detectedResult) {
       // 例: 結果をセットする際にクラスを付与
