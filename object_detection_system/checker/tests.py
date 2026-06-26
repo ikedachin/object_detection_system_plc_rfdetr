@@ -1,14 +1,17 @@
 import io
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 from asgiref.sync import async_to_sync
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from PIL import Image
 
 from checker.applications.detect import detect_objects
 from checker.applications import plc_monitor
+from checker.applications.rfdetr_model import resolve_project_root_path
 from checker.applications.snap_service import encode_png_from_rgb_array
 
 
@@ -43,6 +46,42 @@ class RfdetrDetectObjectsTests(TestCase):
         self.assertEqual(result_dict, {"part": 1})
         self.assertEqual(model.calls, [((100, 100), 0.7)])
         self.assertEqual(image_array.shape, (100, 100, 3))
+
+
+class ResolveProjectRootPathTests(TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.project_root = Path(self.tmp.name) / "object_detection_system_plc_rfdetr"
+        self.override = override_settings(PROJECT_ROOT=self.project_root)
+        self.override.enable()
+
+    def tearDown(self):
+        self.override.disable()
+        self.tmp.cleanup()
+
+    def test_relative_path_is_resolved_under_project_root(self):
+        result = resolve_project_root_path("projects/demo/models/checkpoint.pth")
+
+        self.assertEqual(result, self.project_root / "projects/demo/models/checkpoint.pth")
+
+    def test_native_absolute_path_is_returned_without_prefixing_project_root(self):
+        absolute_path = self.project_root / "projects/demo/models/checkpoint.pth"
+
+        result = resolve_project_root_path(absolute_path)
+
+        self.assertEqual(result, absolute_path)
+
+    def test_windows_project_path_is_rebased_to_current_project_root(self):
+        result = resolve_project_root_path(
+            r"C:\Users\user\object_detection_system_plc_rfdetr\projects\demo\models\checkpoint.pth"
+        )
+
+        self.assertEqual(result, self.project_root / "projects/demo/models/checkpoint.pth")
+
+    def test_windows_settings_path_is_rebased_to_current_project_root(self):
+        result = resolve_project_root_path(r"C:\Users\user\repo\settings\rfdetr_detect.yaml")
+
+        self.assertEqual(result, self.project_root / "settings/rfdetr_detect.yaml")
 
 
 class LatestPlcResultTests(TestCase):

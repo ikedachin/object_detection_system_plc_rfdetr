@@ -14,7 +14,7 @@ from django.conf import settings
 from annotator.models import Project
 from checker.applications import detect, quality_verify
 from checker.applications.get_img import StillCamera
-from checker.applications.rfdetr_model import load_model_for_training_run
+from checker.applications.rfdetr_model import load_model_for_training_run, resolve_project_root_path
 from get_imgs.applications import camera_get_data
 from training.models import TrainingRun
 
@@ -29,13 +29,6 @@ image_size_dict = {
 pixes = image_size_dict['SD480p']
 camera = None
 snap_lock = threading.Lock()
-
-
-def resolve_project_root_path(path_value):
-    path = Path(str(path_value).replace('\\', '/'))
-    if path.is_absolute():
-        return path
-    return Path(settings.PROJECT_ROOT) / path
 
 
 def is_snap_running():
