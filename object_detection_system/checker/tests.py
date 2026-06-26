@@ -2,7 +2,7 @@ import io
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import numpy as np
 from asgiref.sync import async_to_sync
@@ -11,6 +11,7 @@ from PIL import Image
 
 from checker.applications.detect import detect_objects
 from checker.applications import plc_monitor
+from checker import checker_consumers
 from checker.applications.rfdetr_model import resolve_project_root_path
 from checker.applications.snap_service import encode_png_from_rgb_array
 
@@ -173,3 +174,38 @@ class PlcResultSignalTests(TestCase):
             ("D", 200, 0, 1),
         ])
         self.assertTrue(client.closed)
+
+
+class ConfirmApiTests(TestCase):
+    def test_confirm_api_writes_plc_signals_by_default(self):
+        snap_result = SimpleNamespace(result=True)
+
+        with (
+            patch("checker.checker_consumers.run_snap_backend", new=AsyncMock(return_value=snap_result)),
+            patch("checker.applications.plc_monitor.write_snap_result_signals") as write_signals,
+        ):
+            result = checker_consumers.run_confirm_snap_request_sync()
+
+        self.assertIs(result, snap_result)
+        write_signals.assert_called_once_with(snap_result)
+
+    def test_confirm_api_can_skip_plc_signal_write_for_plc_monitor_post_processing(self):
+        snap_result = SimpleNamespace(result=True)
+
+        with (
+            patch("checker.checker_consumers.run_snap_backend", new=AsyncMock(return_value=snap_result)),
+            patch("checker.applications.plc_monitor.write_snap_result_signals") as write_signals,
+        ):
+            result = checker_consumers.run_confirm_snap_request_sync(write_plc_signals=False)
+
+        self.assertIs(result, snap_result)
+        write_signals.assert_not_called()
+
+    def test_plc_monitor_uses_confirm_api_without_duplicate_signal_write(self):
+        snap_result = SimpleNamespace(result=True)
+
+        with patch("checker.checker_consumers.run_confirm_snap_request_sync", return_value=snap_result) as confirm_api:
+            result = plc_monitor.run_checker_confirm_api()
+
+        self.assertIs(result, snap_result)
+        confirm_api.assert_called_once_with(write_plc_signals=False)

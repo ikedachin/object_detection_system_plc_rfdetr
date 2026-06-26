@@ -32,7 +32,7 @@ from django.apps import apps  # noqa: E402
 if not apps.ready and not getattr(apps, "loading", False):
     django.setup()
 
-from checker.applications.snap_service import is_snap_running, run_snap_backend_sync  # noqa: E402
+from checker.applications.snap_service import is_snap_running  # noqa: E402
 
 
 logger = logging.getLogger(__name__)
@@ -488,6 +488,12 @@ def write_snap_error_signals(config=None):
     }]
 
 
+def run_checker_confirm_api():
+    from checker.checker_consumers import run_confirm_snap_request_sync
+
+    return run_confirm_snap_request_sync(write_plc_signals=False)
+
+
 def run_monitor():
     config = load_config()
     client = build_plc_client(config)
@@ -528,7 +534,7 @@ def run_monitor():
                     logger.info("PLC trigger detected. Monitoring is paused while judgment is running.")
                     clear_runtime_signals(client, monitor, result_signal)
                     try:
-                        snap_result = run_snap_backend_sync()
+                        snap_result = run_checker_confirm_api()
                     except Exception as exc:
                         client.write_bit(monitor["area"], monitor["word_address"], monitor["bit"], 0)
                         write_error_result_signals(client, result_signal)
