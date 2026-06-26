@@ -13,6 +13,7 @@ from urllib import error as urlerror, request
 import yaml
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from websockets.sync.client import connect as websocket_connect
 
 
 THIS_FILE = Path(__file__).resolve()
@@ -32,7 +33,7 @@ from django.apps import apps  # noqa: E402
 if not apps.ready and not getattr(apps, "loading", False):
     django.setup()
 
-from checker.applications.snap_service import is_snap_running  # noqa: E402
+from checker.applications.snap_service import SnapResult, is_snap_running  # noqa: E402
 
 
 logger = logging.getLogger(__name__)
@@ -488,10 +489,54 @@ def write_snap_error_signals(config=None):
     }]
 
 
-def run_checker_confirm_api():
-    from checker.checker_consumers import run_confirm_snap_request_sync
+def get_confirm_websocket_url(config):
+    checker_api = config.get("checker_api", {})
+    return checker_api.get("confirm_ws_url", "ws://127.0.0.1:8000/checker/ws/confirm/")
 
-    return run_confirm_snap_request_sync(write_plc_signals=False)
+
+def run_checker_confirm_api(config=None):
+    config = config or load_config()
+    checker_api = config.get("checker_api", {})
+    url = get_confirm_websocket_url(config)
+    timeout = float(checker_api.get("timeout", 60.0))
+    request_payload = {
+        "snap": "True",
+        "datetime": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "source": "plc_monitor",
+    }
+
+    logger.info("Calling checker confirm WebSocket API: %s", url)
+    image_bytes = None
+    result_payload = None
+
+    with websocket_connect(
+        url,
+        open_timeout=timeout,
+        close_timeout=timeout,
+        max_size=None,
+    ) as websocket:
+        websocket.send(json.dumps(request_payload))
+        for _ in range(2):
+            message = websocket.recv(timeout=timeout)
+            if isinstance(message, bytes):
+                image_bytes = message
+                continue
+
+            data = json.loads(message)
+            if data.get("error"):
+                raise RuntimeError(data["error"])
+            result_payload = data
+
+    if image_bytes is None or result_payload is None:
+        raise RuntimeError("checker confirm WebSocket API did not return image and result payload")
+
+    return SnapResult(
+        message=result_payload.get("message", ""),
+        timestamp=result_payload.get("timestamp", time.strftime("%Y-%m-%dT%H:%M:%S")),
+        result_dict=result_payload.get("result_dict", {}),
+        result=bool(result_payload.get("result")),
+        image_bytes=image_bytes,
+    )
 
 
 def run_monitor():
@@ -534,7 +579,7 @@ def run_monitor():
                     logger.info("PLC trigger detected. Monitoring is paused while judgment is running.")
                     clear_runtime_signals(client, monitor, result_signal)
                     try:
-                        snap_result = run_checker_confirm_api()
+                        snap_result = run_checker_confirm_api(config)
                     except Exception as exc:
                         client.write_bit(monitor["area"], monitor["word_address"], monitor["bit"], 0)
                         write_error_result_signals(client, result_signal)

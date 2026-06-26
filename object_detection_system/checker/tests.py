@@ -1,4 +1,5 @@
 import io
+import json
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -201,11 +202,51 @@ class ConfirmApiTests(TestCase):
         self.assertIs(result, snap_result)
         write_signals.assert_not_called()
 
-    def test_plc_monitor_uses_confirm_api_without_duplicate_signal_write(self):
-        snap_result = SimpleNamespace(result=True)
+    def test_plc_monitor_calls_confirm_websocket_api(self):
+        class FakeWebSocket:
+            def __init__(self):
+                self.sent = []
+                self.messages = [
+                    b"png-bytes",
+                    json.dumps({
+                        "message": "OK",
+                        "timestamp": "2026-06-26T16:31:16",
+                        "result_dict": {"part": 1},
+                        "result": True,
+                    }),
+                ]
 
-        with patch("checker.checker_consumers.run_confirm_snap_request_sync", return_value=snap_result) as confirm_api:
-            result = plc_monitor.run_checker_confirm_api()
+            def __enter__(self):
+                return self
 
-        self.assertIs(result, snap_result)
-        confirm_api.assert_called_once_with(write_plc_signals=False)
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def send(self, message):
+                self.sent.append(json.loads(message))
+
+            def recv(self, timeout=None):
+                return self.messages.pop(0)
+
+        fake_websocket = FakeWebSocket()
+        config = {
+            "checker_api": {
+                "confirm_ws_url": "ws://127.0.0.1:8000/checker/ws/confirm/",
+                "timeout": 12.0,
+            }
+        }
+
+        with patch("checker.applications.plc_monitor.websocket_connect", return_value=fake_websocket) as connect:
+            result = plc_monitor.run_checker_confirm_api(config)
+
+        connect.assert_called_once_with(
+            "ws://127.0.0.1:8000/checker/ws/confirm/",
+            open_timeout=12.0,
+            close_timeout=12.0,
+            max_size=None,
+        )
+        self.assertEqual(fake_websocket.sent[0]["snap"], "True")
+        self.assertEqual(fake_websocket.sent[0]["source"], "plc_monitor")
+        self.assertEqual(result.image_bytes, b"png-bytes")
+        self.assertEqual(result.result_dict, {"part": 1})
+        self.assertTrue(result.result)
