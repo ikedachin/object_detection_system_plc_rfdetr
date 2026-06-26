@@ -13,6 +13,7 @@ from PIL import Image
 from checker.applications.detect import detect_objects
 from checker.applications import plc_monitor
 from checker import checker_consumers
+from checker.applications.get_img import StillCamera
 from checker.applications.rfdetr_model import resolve_project_root_path
 from checker.applications.snap_service import encode_png_from_rgb_array
 
@@ -124,6 +125,37 @@ class SnapImageEncodingTests(TestCase):
         decoded = Image.open(io.BytesIO(png_bytes)).convert("RGB")
 
         self.assertEqual(decoded.getpixel((0, 0)), (255, 0, 0))
+
+
+class StillCameraTests(TestCase):
+    def test_get_jpg_uses_latest_frame_and_keeps_square_padding(self):
+        frame = np.zeros((2, 3, 3), dtype=np.uint8)
+        frame[:, :] = [10, 20, 30]
+
+        class FakeVideoCamera:
+            cap = SimpleNamespace(isOpened=lambda: True)
+
+            def __init__(self, src=0, **resolution):
+                self.src = src
+                self.resolution = resolution
+                self.stopped = False
+
+            def is_opened(self):
+                return True
+
+            def get_frame(self):
+                return frame.copy()
+
+            def stop(self):
+                self.stopped = True
+
+        with patch("checker.applications.get_img.VideoCamera", FakeVideoCamera):
+            camera = StillCamera(src=0, width=3, height=2)
+            captured = camera.get_jpg()
+
+        self.assertEqual(captured.shape, (3, 3, 3))
+        self.assertTrue((captured[:2, :3] == [10, 20, 30]).all())
+        self.assertTrue((captured[2, :3] == [1, 1, 1]).all())
 
 
 class PlcResultSignalTests(TestCase):

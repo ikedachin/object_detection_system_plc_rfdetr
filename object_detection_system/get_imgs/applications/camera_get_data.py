@@ -1,7 +1,8 @@
-import cv2
-from threading import Thread, Lock
-import time
 import platform
+import time
+from threading import Lock, Thread
+
+import cv2
 
 
 #################################
@@ -32,80 +33,135 @@ class VideoCamera:
     別スレッドで常時キャプチャし、最新フレームを保持する。
     """
     def __init__(self, src=None, **resolution):
-        self.image_size = resolution['image_size_dict']
-        self.width = self.image_size.get('width', 640)
-        self.height = self.image_size.get('height', 480)
+        image_size = resolution.get('image_size_dict') or {}
+        self.width = int(resolution.get('width') or image_size.get('width') or 640)
+        self.height = int(resolution.get('height') or image_size.get('height') or 480)
+        self.image_size = {'width': self.width, 'height': self.height}
 
-        self.fps = resolution.get('fps', 30)
-        self.sec_per_frame = resolution.get('sec_per_frame', 1)
+        self.fps = self._resolve_positive_number(resolution.get('fps'), 30)
+        default_sec_per_frame = 1 / self.fps if self.fps > 0 else 1 / 30
+        self.sec_per_frame = self._resolve_positive_number(
+            resolution.get('sec_per_frame'),
+            default_sec_per_frame,
+        )
+        self.warmup_frames = int(resolution.get('warmup_frames', 5))
+        self.startup_delay = self._resolve_positive_number(resolution.get('startup_delay'), 0.5, allow_zero=True)
         print('Capture Size: ', self.width, self.height)
         print(resolution)
-        
-        # カメラインデックスが指定されていない場合、利用可能なカメラを検索
-        # if src is None:
-        #     available_cameras = find_available_cameras()
-        #     if not available_cameras:
-        #         raise RuntimeError("利用可能なカメラが見つかりません")
-        #     src = available_cameras[0]
-        #     print(f"カメラ {src} を使用します")
-        
+
+        if src is None:
+            cameras = find_available_cameras()
+            if not cameras:
+                raise RuntimeError("利用可能なカメラが見つかりません")
+            src = cameras[0]
+            print(f"カメラ {src} を使用します")
+
         self.src = src
         self.cap = None
-        self._initialize_camera()
-        
         self.lock = Lock()
         self.frame = None
+        self.running = False
+        self.thread = None
+
+        self._initialize_camera()
         self.running = True
-        Thread(target=self._update, daemon=True).start()
-        
-        # カメラの初期化を待つ
-        time.sleep(0.5)
-    
+        self.thread = Thread(target=self._update, daemon=True)
+        self.thread.start()
+
+        if self.startup_delay:
+            time.sleep(self.startup_delay)
+
+    @staticmethod
+    def _resolve_positive_number(value, default, allow_zero=False):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return default
+        if number > 0 or (allow_zero and number == 0):
+            return number
+        return default
+
+    def _camera_backends(self):
+        if platform.system() == 'Windows':
+            print('Windows の場合、DirectShow / MSMF / 既定バックエンドを順に試します')
+            return [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
+        print('MacOS または Linux の場合、デフォルトのバックエンドを使用します')
+        return [None]
+
+    def _open_capture(self, backend):
+        if backend is None:
+            return cv2.VideoCapture(self.src)
+        return cv2.VideoCapture(self.src, backend)
+
+    def _configure_capture(self, cap):
+        for prop, value in (
+            (cv2.CAP_PROP_FRAME_WIDTH, self.width),
+            (cv2.CAP_PROP_FRAME_HEIGHT, self.height),
+            (cv2.CAP_PROP_FPS, self.fps),
+            (cv2.CAP_PROP_BUFFERSIZE, 1),
+        ):
+            try:
+                cap.set(prop, value)
+            except Exception as exc:
+                print(f"カメラ設定を適用できませんでした: prop={prop}, value={value}, error={exc}")
+
+        try:
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+        except Exception as exc:
+            print(f"MJPG FourCC を適用できませんでした: {exc}")
+
+    def _warm_up_capture(self, cap):
+        warmup_frames = max(1, self.warmup_frames)
+        last_frame = None
+        for _ in range(warmup_frames):
+            ret, frame = cap.read()
+            if ret and frame is not None:
+                last_frame = frame.copy()
+        if last_frame is not None:
+            with self.lock:
+                self.frame = last_frame
+            return True
+        return False
+
     def _initialize_camera(self):
         """カメラを初期化"""
         print(f"カメラ {self.src} を初期化中...")
+        previous_cap = self.cap
         self.cap = None
-        # DirectShowバックエンドを試行（Windowsの場合）
-        if platform.system() == 'Windows':
-            print('Windows の場合、DirectShow バックエンドを使用します')
-            backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
-            for backend in backends:
-                try:
-                    self.cap = cv2.VideoCapture(self.src, backend)
-                    if self.cap.isOpened():
-                        # テスト読み込み
-                        ret, test_frame = self.cap.read()
-                        if ret:
-                            print(f"カメラ {self.src} が正常に初期化されました (バックエンド: {backend})")
-                            break
-                        else:
-                            print(f"カメラ {self.src} からフレームを読み込めません (バックエンド: {backend})")
-                            self.cap.release()
-                            self.cap = None
-                    else:
-                        print(f"カメラ {self.src} を開けません (バックエンド: {backend})")
-                        if self.cap:
-                            self.cap.release()
-                            self.cap = None
-                except Exception as e:
-                    print(f"カメラ初期化エラー (バックエンド: {backend}): {e}")
-                    if self.cap:
-                        self.cap.release()
-                        self.cap = None
-        else:
-            print('MacOS または Linux の場合、デフォルトのバックエンドを使用します')
-            self.cap = cv2.VideoCapture(self.src)
-        
+        if previous_cap is not None:
+            try:
+                previous_cap.release()
+            except Exception:
+                pass
+
+        for backend in self._camera_backends():
+            cap = None
+            try:
+                cap = self._open_capture(backend)
+                if not cap.isOpened():
+                    print(f"カメラ {self.src} を開けません (バックエンド: {backend})")
+                    continue
+
+                self._configure_capture(cap)
+                if not self._warm_up_capture(cap):
+                    print(f"カメラ {self.src} からフレームを読み込めません (バックエンド: {backend})")
+                    continue
+
+                self.cap = cap
+                print(f"カメラ {self.src} が正常に初期化されました (バックエンド: {backend})")
+                break
+            except Exception as e:
+                print(f"カメラ初期化エラー (バックエンド: {backend}): {e}")
+            finally:
+                if self.cap is not cap and cap is not None:
+                    try:
+                        cap.release()
+                    except Exception:
+                        pass
+
         if self.cap is None or not self.cap.isOpened():
             raise RuntimeError(f"カメラ {self.src} を初期化できません")
-        
-        # 解像度を設定
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        
-        # バッファサイズを設定（遅延を減らすため）
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        
+
         # 実際に設定された解像度を確認
         actual_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -142,11 +198,10 @@ class VideoCamera:
                 # 成功した場合はエラーカウントをリセット
                 error_count = 0
                 frame_count += 1
-                
+
                 with self.lock:
-                    self.frame = frame
-                    del frame
-                
+                    self.frame = frame.copy()
+
                 # # 100フレームごとにメッセージ表示
                 # if frame_count % 100 == 0:
                 #     print(f"フレーム {frame_count} を処理しました")
@@ -193,6 +248,8 @@ class VideoCamera:
         """カメラを停止"""
         print("カメラを停止中...")
         self.running = False
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1)
         if self.cap:
             self.cap.release()
             self.cap = None
