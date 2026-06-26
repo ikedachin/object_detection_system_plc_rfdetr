@@ -16,7 +16,6 @@ def quality_verify_common(result_dict):
 # 's'の場合は8が合格、'c'の場合は9が合格
 # それ以外は不合格
 def quality_verify_thr17(result_dict):
-
     if len(result_dict) == 1:
         key, value = list(result_dict.items())[0]
         if key == "s":

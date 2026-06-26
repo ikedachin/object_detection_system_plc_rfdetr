@@ -2,10 +2,14 @@ plc:
   enabled: false
 
 test_server:
-  enabled: false
+  enabled: true
   host: "127.0.0.1"
   port: 8010
   base_url: "http://127.0.0.1:8010"
+
+checker_api:
+  confirm_ws_url: "ws://127.0.0.1:8000/checker/ws/confirm/"
+  timeout: 60.0
 
 connection:
   host: "127.0.0.1"

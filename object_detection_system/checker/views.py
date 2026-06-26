@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from django.conf import settings
 from checker.applications.detect import detect_objects
-from checker.applications.rfdetr_model import load_model_for_training_run
+from checker.applications.rfdetr_model import load_model_for_training_run, resolve_project_root_path
 import yaml
 
 
@@ -22,12 +22,6 @@ model_loaded_training_id = None  # 現在ロードされているモデルの学
 
 # Create your views here.
 
-
-def resolve_project_root_path(path_value):
-    path = Path(str(path_value).replace('\\', '/'))
-    if path.is_absolute():
-        return path
-    return Path(settings.PROJECT_ROOT) / path
 
 def checker_index(request):
     print("Index view called")
@@ -42,19 +36,21 @@ def checker_index(request):
     active_project_id = None
     active_config_filename = None
     config_files = []
-    
+    initial_model_load_training_id = None
+    initial_model_load_pending = False
+
     try:
         if active_project:
             # アクティブプロジェクトの学習一覧を取得
             training_runs = TrainingRun.objects.filter(project=active_project).order_by('-trained_at')
             # アクティブな学習を取得
             active_training = TrainingRun.objects.filter(project=active_project, is_active=True).first()
-            
+
             if not active_training and training_runs.exists():
                 # アクティブな学習がない場合は最新の学習をアクティブにする
                 active_training = training_runs.first()
                 active_training.set_active()
-            
+
             if active_training and active_training.saved_model_path:
                 print(f"Active training model path: {active_training.saved_model_path}")
                 selected_project = active_project.name
@@ -62,22 +58,15 @@ def checker_index(request):
                 # 設定ファイルから設定ファイル名を取得
                 active_config_filename = os.path.basename(active_training.config_yaml_path) if active_training.config_yaml_path else ""
                 models_path = resolve_project_root_path(active_training.saved_model_path)
-                
-                # グローバル変数のモデル状態をチェック
+                print(f"Resolved model path: {models_path}")
+
                 global model, model_loaded_training_id, model_loading
-                
+
                 if models_path.exists():
-                    # 既に同じモデルがロードされているかチェック
-                    if model is None or model_loaded_training_id != active_training.id:
-                        print(f"Loading model from: {active_training.saved_model_path}")
-                        try:
-                            model = load_model_for_training_run(active_training)
-                            model_loaded_training_id = active_training.id
-                            print(f"Model loaded successfully for training: {active_training.training_name}")
-                        except Exception as e:
-                            print(f"Error loading model: {e}")
-                            model = None
-                            model_loaded_training_id = None
+                    initial_model_load_training_id = active_training.id
+                    initial_model_load_pending = model_loading or model is None or model_loaded_training_id != active_training.id
+                    if initial_model_load_pending:
+                        print(f"Model will be loaded asynchronously: {active_training.training_name}")
                     else:
                         print(f"Model already loaded for training: {active_training.training_name}")
                 else:
@@ -106,6 +95,9 @@ def checker_index(request):
         'selected_project': selected_project,
         'active_project_id': active_project_id,
         'active_config_filename': active_config_filename,
+        'initial_model_load_training_id': initial_model_load_training_id,
+        'initial_model_load_pending': initial_model_load_pending,
+        'model_loading': model_loading,
         'result_message': None if 'result_message' not in locals() else result_message,
     })
 
@@ -209,18 +201,18 @@ def set_active_project(request):
         try:
             data = json.loads(request.body)
             project_id = data.get('project_id')
-            
+
             if not project_id:
                 return JsonResponse({'success': False, 'error': 'プロジェクトIDが必要です'})
-            
+
             # 既存のアクティブプロジェクトを無効化
             Project.objects.filter(is_active=True).update(is_active=False)
-            
+
             # 指定されたプロジェクトをアクティブ化
             project = get_object_or_404(Project, id=project_id)
             project.is_active = True
             project.save()
-            
+
             return JsonResponse({
                 'success': True,
                 'message': f'プロジェクト "{project.name}" をアクティブにしました'
@@ -229,7 +221,7 @@ def set_active_project(request):
             return JsonResponse({'success': False, 'error': '指定されたプロジェクトが見つかりません'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
-    
+
     return JsonResponse({'success': False, 'error': 'POSTリクエストが必要です'})
 
 
@@ -240,20 +232,20 @@ def set_active_training(request):
         try:
             data = json.loads(request.body)
             training_id = data.get('training_id')
-            
+
             if not training_id:
                 return JsonResponse({'success': False, 'error': '学習IDが必要です'})
-            
+
             # 指定された学習をアクティブ化
             training_run = get_object_or_404(TrainingRun, id=training_id)
             training_run.set_active()
-            
+
             # プロジェクトもアクティブにする
             if not training_run.project.is_active:
                 Project.objects.filter(is_active=True).update(is_active=False)
                 training_run.project.is_active = True
                 training_run.project.save()
-            
+
             return JsonResponse({
                 'success': True,
                 'message': f'学習モデル "{training_run.training_name}" をアクティブにしました'
@@ -262,7 +254,7 @@ def set_active_training(request):
             return JsonResponse({'success': False, 'error': '指定された学習が見つかりません'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
-    
+
     return JsonResponse({'success': False, 'error': 'POSTリクエストが必要です'})
 
 
@@ -271,25 +263,22 @@ def load_model_async(training_run):
     非同期でモデルをロードする関数
     """
     global model, model_loading, model_loaded_training_id
-    
+
     try:
         model_loading = True
         print(f"モデルロード開始: {training_run.training_name}")
-        
+
         # モデルパスの確認
         if not training_run.saved_model_path:
             raise Exception("モデルパスが設定されていません")
-        
         models_path = resolve_project_root_path(training_run.saved_model_path)
         if not models_path.exists():
             raise Exception(f"モデルファイルが存在しません: {models_path}")
-        
-        print(f"RF-DETRモデルロード中: {models_path}")
-        model = load_model_for_training_run(training_run)
+        model = load_model_for_training_run(training_run)            ############ check ############
         model_loaded_training_id = training_run.id
-        
+
         print(f"モデルロード完了: {training_run.training_name}")
-        
+
     except Exception as e:
         print(f"モデルロードエラー: {e}")
         model = None
@@ -307,12 +296,12 @@ def load_model_for_training(request):
         try:
             data = json.loads(request.body)
             training_id = data.get('training_id')
-            
+
             if not training_id:
                 return JsonResponse({'success': False, 'error': '学習IDが必要です'})
-            
+
             training_run = get_object_or_404(TrainingRun, id=training_id)
-            
+
             # 既に同じモデルがロードされている場合はスキップ
             global model_loaded_training_id, model_loading
             if model_loaded_training_id == training_id and model is not None:
@@ -321,7 +310,7 @@ def load_model_for_training(request):
                     'message': 'モデルは既にロードされています',
                     'status': 'loaded'
                 })
-            
+
             # 現在ロード中の場合
             if model_loading:
                 return JsonResponse({
@@ -329,23 +318,23 @@ def load_model_for_training(request):
                     'message': 'モデルロード中です...',
                     'status': 'loading'
                 })
-            
+
             # 非同期でモデルをロード
             thread = threading.Thread(target=load_model_async, args=(training_run,))
             thread.daemon = True
             thread.start()
-            
+
             return JsonResponse({
                 'success': True,
                 'message': f'モデル "{training_run.training_name}" のロードを開始しました',
                 'status': 'loading'
             })
-            
+
         except TrainingRun.DoesNotExist:
             return JsonResponse({'success': False, 'error': '指定された学習が見つかりません'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
-    
+
     return JsonResponse({'success': False, 'error': 'POSTリクエストが必要です'})
 
 
@@ -355,7 +344,7 @@ def check_model_status(request):
     モデルのロード状況を確認するAPI
     """
     global model, model_loading, model_loaded_training_id
-    
+
     if model_loading:
         status = 'loading'
         message = 'モデルロード中...'
@@ -370,7 +359,7 @@ def check_model_status(request):
     else:
         status = 'not_loaded'
         message = 'モデルがロードされていません'
-    
+
     return JsonResponse({
         'success': True,
         'status': status,
@@ -395,4 +384,16 @@ def reset_plc_result_signals(request):
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+def latest_plc_result(request):
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'error': 'GETリクエストが必要です'})
+
+    from checker.applications.plc_monitor import get_latest_plc_result
+
+    return JsonResponse({
+        'success': True,
+        'result': get_latest_plc_result(),
+    })
 

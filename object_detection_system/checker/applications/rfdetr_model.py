@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import yaml
 from django.conf import settings
@@ -6,11 +6,40 @@ from django.conf import settings
 from training.applications.rfdetr_native import create_model
 
 
+def _rebase_foreign_project_path(path_value, project_root):
+    path_text = str(path_value).strip().replace("\\", "/")
+    parts = [part for part in path_text.split("/") if part and not part.endswith(":")]
+
+    for marker in (project_root.name, "projects", "settings"):
+        if marker in parts:
+            marker_index = parts.index(marker)
+            relative_parts = parts[marker_index + 1:] if marker == project_root.name else parts[marker_index:]
+            return project_root.joinpath(*relative_parts)
+
+    return None
+
+
 def resolve_project_root_path(path_value):
-    path = Path(str(path_value).replace("\\", "/"))
+    project_root = Path(settings.PROJECT_ROOT)
+    if path_value is None:
+        return project_root
+
+    path_text = str(path_value).strip()
+    if not path_text:
+        return project_root
+
+    normalized_text = path_text.replace("\\", "/")
+    path = Path(normalized_text).expanduser()
+
     if path.is_absolute():
         return path
-    return Path(settings.PROJECT_ROOT) / path
+
+    windows_path = PureWindowsPath(path_text)
+    if windows_path.is_absolute():
+        rebased_path = _rebase_foreign_project_path(path_text, project_root)
+        return rebased_path or Path(normalized_text)
+
+    return project_root / normalized_text
 
 
 def load_rfdetr_config(config_path):

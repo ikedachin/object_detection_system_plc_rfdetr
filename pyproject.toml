@@ -22,4 +22,5 @@ dependencies = [
     "rfdetr[train,loggers]",
     "supervision>=0.25.0",
     "uvicorn[standard]>=0.30.0",
+    "websockets>=16.0",
 ]

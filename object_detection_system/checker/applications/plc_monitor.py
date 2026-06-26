@@ -1,5 +1,6 @@
 import logging
 import base64
+import copy
 import os
 import tempfile
 import sys
@@ -12,6 +13,7 @@ from urllib import error as urlerror, request
 import yaml
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from websockets.sync.client import connect as websocket_connect
 
 
 THIS_FILE = Path(__file__).resolve()
@@ -31,11 +33,13 @@ from django.apps import apps  # noqa: E402
 if not apps.ready and not getattr(apps, "loading", False):
     django.setup()
 
-from checker.applications.snap_service import is_snap_running, run_snap_backend_sync  # noqa: E402
+from checker.applications.snap_service import SnapResult, is_snap_running  # noqa: E402
 
 
 logger = logging.getLogger(__name__)
 _background_thread = None
+_latest_plc_result = None
+_latest_plc_result_lock = threading.Lock()
 
 
 class AlreadyRunningError(RuntimeError):
@@ -283,6 +287,23 @@ def notify_checker_status(payload):
     )
 
 
+def set_latest_plc_result(payload):
+    global _latest_plc_result
+    with _latest_plc_result_lock:
+        _latest_plc_result = copy.deepcopy(payload)
+
+
+def get_latest_plc_result():
+    with _latest_plc_result_lock:
+        return copy.deepcopy(_latest_plc_result)
+
+
+def clear_latest_plc_result():
+    global _latest_plc_result
+    with _latest_plc_result_lock:
+        _latest_plc_result = None
+
+
 def _read_signal(client, signal, default=False):
     if not signal:
         return default
@@ -362,6 +383,7 @@ def reset_result_signals(config=None):
     client = build_plc_client(config)
     if client is None:
         logger.info("PLC and test server are disabled by settings. Result signal reset is skipped.")
+        clear_latest_plc_result()
         return [{
             "name": "plc",
             "skipped": True,
@@ -370,6 +392,7 @@ def reset_result_signals(config=None):
 
     result_signal = config.get("result_signal")
     if not result_signal:
+        clear_latest_plc_result()
         return []
 
     reset_targets = []
@@ -399,7 +422,121 @@ def reset_result_signals(config=None):
             })
     finally:
         client.close()
+    clear_latest_plc_result()
     return reset_targets
+
+
+def write_snap_result_signals(snap_result, config=None):
+    config = config or load_config()
+    client = build_plc_client(config)
+    if client is None:
+        logger.info("PLC and test server are disabled by settings. Snap result signal write is skipped.")
+        return [{
+            "name": "plc",
+            "skipped": True,
+            "reason": "PLC and test server are disabled in settings/plc_settings.yaml",
+        }]
+
+    result_signal = config.get("result_signal")
+    if not result_signal:
+        client.close()
+        return []
+
+    try:
+        write_completed_result_signals(client, result_signal, snap_result.result)
+    finally:
+        client.close()
+
+    return [{
+        "name": "ok",
+        "value": 1 if snap_result.result else 0,
+    }, {
+        "name": "error",
+        "value": 0 if snap_result.result else 1,
+    }, {
+        "name": "complete",
+        "value": 0 if snap_result.result else 1,
+    }]
+
+
+def write_snap_error_signals(config=None):
+    config = config or load_config()
+    client = build_plc_client(config)
+    if client is None:
+        logger.info("PLC and test server are disabled by settings. Snap error signal write is skipped.")
+        return [{
+            "name": "plc",
+            "skipped": True,
+            "reason": "PLC and test server are disabled in settings/plc_settings.yaml",
+        }]
+
+    result_signal = config.get("result_signal")
+    if not result_signal:
+        client.close()
+        return []
+
+    try:
+        write_error_result_signals(client, result_signal)
+    finally:
+        client.close()
+
+    return [{
+        "name": "error",
+        "value": 1,
+    }, {
+        "name": "complete",
+        "value": 1,
+    }]
+
+
+def get_confirm_websocket_url(config):
+    checker_api = config.get("checker_api", {})
+    return checker_api.get("confirm_ws_url", "ws://127.0.0.1:8000/checker/ws/confirm/")
+
+
+def run_checker_confirm_api(config=None):
+    config = config or load_config()
+    checker_api = config.get("checker_api", {})
+    url = get_confirm_websocket_url(config)
+    timeout = float(checker_api.get("timeout", 60.0))
+    request_payload = {
+        "snap": "True",
+        "datetime": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "source": "plc_monitor",
+    }
+
+    logger.info("Calling checker confirm WebSocket API: %s", url)
+    image_bytes = None
+    result_payload = None
+
+    with websocket_connect(
+        url,
+        open_timeout=timeout,
+        close_timeout=timeout,
+        max_size=None,
+    ) as websocket:
+        websocket.send(json.dumps(request_payload))
+        for _ in range(2):
+            message = websocket.recv(timeout=timeout)
+            if isinstance(message, bytes):
+                image_bytes = message
+                continue
+
+            data = json.loads(message)
+            if data.get("error"):
+                raise RuntimeError(data["error"])
+            result_payload = data
+
+    if image_bytes is None or result_payload is None:
+        raise RuntimeError("checker confirm WebSocket API did not return image and result payload")
+
+    return SnapResult(
+        message=result_payload.get("message", ""),
+        timestamp=result_payload.get("timestamp", time.strftime("%Y-%m-%dT%H:%M:%S")),
+        result_dict=result_payload.get("result_dict", {}),
+        result=bool(result_payload.get("result")),
+        image_bytes=image_bytes,
+    )
 
 
 def run_monitor():
@@ -442,22 +579,24 @@ def run_monitor():
                     logger.info("PLC trigger detected. Monitoring is paused while judgment is running.")
                     clear_runtime_signals(client, monitor, result_signal)
                     try:
-                        snap_result = run_snap_backend_sync()
+                        snap_result = run_checker_confirm_api(config)
                     except Exception as exc:
                         client.write_bit(monitor["area"], monitor["word_address"], monitor["bit"], 0)
                         write_error_result_signals(client, result_signal)
-                        notify_checker_status({
+                        payload = {
                             "type": "plc_status",
                             "status": "error",
                             "error": "PLCトリガーによる判定に失敗しました: " + str(exc),
                             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                        })
+                        }
+                        set_latest_plc_result(payload)
+                        notify_checker_status(payload)
                         raise
 
                     logger.info("Snap backend completed: result=%s result_dict=%s", snap_result.result, snap_result.result_dict)
                     client.write_bit(monitor["area"], monitor["word_address"], monitor["bit"], 0)
                     write_completed_result_signals(client, result_signal, snap_result.result)
-                    notify_checker_status({
+                    payload = {
                         "type": "plc_status",
                         "status": "completed",
                         "result": snap_result.result,
@@ -465,7 +604,9 @@ def run_monitor():
                         "message": snap_result.message,
                         "timestamp": snap_result.timestamp,
                         "image_data_url": "data:image/png;base64," + base64.b64encode(snap_result.image_bytes).decode("ascii"),
-                    })
+                    }
+                    set_latest_plc_result(payload)
+                    notify_checker_status(payload)
             except urlerror.URLError as exc:
                 now = time.monotonic()
                 if now - last_connection_error_log >= 30.0:

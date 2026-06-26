@@ -14,7 +14,7 @@ from django.conf import settings
 from annotator.models import Project
 from checker.applications import detect, quality_verify
 from checker.applications.get_img import StillCamera
-from checker.applications.rfdetr_model import load_model_for_training_run
+from checker.applications.rfdetr_model import load_model_for_training_run, resolve_project_root_path
 from get_imgs.applications import camera_get_data
 from training.models import TrainingRun
 
@@ -29,13 +29,6 @@ image_size_dict = {
 pixes = image_size_dict['SD480p']
 camera = None
 snap_lock = threading.Lock()
-
-
-def resolve_project_root_path(path_value):
-    path = Path(str(path_value).replace('\\', '/'))
-    if path.is_absolute():
-        return path
-    return Path(settings.PROJECT_ROOT) / path
 
 
 def is_snap_running():
@@ -204,6 +197,15 @@ def _load_detect_config(detect_config_path):
     }
 
 
+def encode_png_from_rgb_array(image_array):
+    if image_array.ndim == 3 and image_array.shape[2] == 3:
+        image_array = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+    ret, buf = cv2.imencode('.png', image_array)
+    if not ret:
+        raise RuntimeError("画像のエンコードに失敗しました")
+    return buf.tobytes()
+
+
 async def run_snap_backend() -> SnapResult:
     if not snap_lock.acquire(blocking=False):
         raise RuntimeError('判定中です。現在の処理が完了してから再実行してください。')
@@ -229,9 +231,7 @@ async def run_snap_backend() -> SnapResult:
                 print(f'Detect result: key={key}, value={value}')
 
             predicted_img = img_array[:pixes['height'], :, :]
-            ret, buf = cv2.imencode('.png', predicted_img)
-            if not ret:
-                raise RuntimeError("画像のエンコードに失敗しました")
+            image_bytes = encode_png_from_rgb_array(predicted_img)
 
             result = quality_verify.quality_verify_thr17(result_dict)
             print(f'Approval status: {result}')
@@ -241,7 +241,7 @@ async def run_snap_backend() -> SnapResult:
                 timestamp=timestamp,
                 result_dict=result_dict if isinstance(result_dict, dict) else {},
                 result=result,
-                image_bytes=buf.tobytes(),
+                image_bytes=image_bytes,
             )
         except Exception as exc:
             print(f'推論処理エラー: {exc}')
