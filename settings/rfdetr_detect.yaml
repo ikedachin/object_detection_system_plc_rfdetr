@@ -9,6 +9,3 @@ RF_DETR:
   detect_config:
     conf: 0.45
     verbose: false
-
-image_size:
-  type: HD1080p
