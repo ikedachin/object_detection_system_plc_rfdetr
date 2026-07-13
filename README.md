@@ -29,7 +29,7 @@ Roboflow社のRF-DETRを**誰でも、簡単に**使えることを目的とし�
 - **OpenCV**: カメラ制御と画像処理
 - **Roboflow RF-DETR**: 物体検出モデル
 - **Albumentations**: 学習時の画像拡張
-- **pyfins**: オムロンPLCとのFINS/UDP通信
+- **finscommand**: オムロンPLCとのFINS/UDP通信
 
 ### フロントエンド
 
@@ -289,8 +289,9 @@ behavior:
 - `plc.enabled` はPLC通信のON/OFFです。PLCなしで画面やDjango側をテストする場合は `false`、実機PLCへ接続する場合は `true` にします。
 - `test_server.enabled` はFastAPI製のダミーPLCサーバーを使うかどうかの設定です。`plc.enabled: false` かつ `test_server.enabled: true` の場合、PLC監視スクリプトと `PLC結果リセット` は実PLCではなく `test_server.base_url` へHTTPでアクセスします。
 - `plc.enabled: false` かつ `test_server.enabled: false` の場合、PLC監視スクリプトはPLCへ接続せず終了します。画面右上の `PLC結果リセット` もPLC書き込みをスキップして成功扱いにします。
-- 実PLCへ接続する場合は、使用するFINSライブラリを別途導入してください。`pyfins` はPyPIに通常パッケージとして公開されていないため、GitHub配布版など実環境で使う実装に合わせて導入し、`checker/applications/plc_monitor.py` の `PlcClient` adapterを最終確認してください。
-- GitHub版 `pyfins` を導入する補助スクリプトとして、macOS/Linux用の `install_pyfins.sh` とWindows用の `install_pyfins.bat` を用意しています。
+- 実PLCとのFINS/UDP通信には [finscommand](https://pypi.org/project/finscommand/)（PyPI公開パッケージ）を使用します。通常の依存関係インストール（`uv sync` または `pip install -r requirements.txt`）に含まれるため、追加のインストール作業は不要です。
+- ビットの読み書きはFINSのビットアクセスコマンド（メモリエリアコード: CIO=0x30, W=0x31, H=0x32, A=0x33, D=0x02）で行います。対応エリアは `checker/applications/plc_monitor.py` の `PlcClient` を参照してください。
+- finscommand 0.1.3 の既知の問題（ポート9600固定、`__del__` のタイポ）は `PlcClient` 側で回避しています。詳細は `zzz_docs/plc_monitor_flow.md` の「実PLC通信ライブラリ（finscommand）と適用中のワークアラウンド」を参照してください。
 - `monitor` は現場スイッチONで立つ監視対象ビットです。上記例では `D100.00` を監視します。
 - `result_signal.complete` は次トリガー許可ビットです。初期状態とNG/処理エラー時にON、判定実行中とOK時にOFFになります。
 - `result_signal.ok` はOK通知ビットです。判定OK時にONになります。設備側はこのONを確認して設備を動かした後、初期状態へ戻してください。
@@ -323,19 +324,6 @@ uvを使う場合:
 ```bash
 cd object_detection_system
 uv run python manage.py run_plc_monitor
-```
-
-実PLC用のGitHub版 `pyfins` をインストール:
-
-```bash
-chmod +x install_pyfins.sh
-./install_pyfins.sh
-```
-
-Windowsの場合:
-
-```bat
-install_pyfins.bat
 ```
 
 #### ダミーPLCサーバー

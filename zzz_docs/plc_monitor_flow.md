@@ -185,3 +185,34 @@ PLC監視には2種類の二重起動防止があります。
 - 判定NGまたは処理エラー後は `complete=ON` になるため、次のトリガーを受け付け可能です。
 - ダミーPLCサーバー停止中でもcheckerアプリ全体は停止しません。ただしPLCトリガーは検知できません。
 - `PLC結果リセット` ボタンもダミーPLCサーバーへHTTP書き込みを行うため、サーバー停止中は失敗します。
+
+## 12. 実PLC通信ライブラリ（finscommand）と適用中のワークアラウンド
+
+実PLCとのFINS/UDP通信には、PyPI公開パッケージの [finscommand](https://pypi.org/project/finscommand/)（0.1.3）を使用しています。`checker/applications/plc_monitor.py` の `PlcClient` がアダプタです。
+
+finscommandをそのまま使わず、`PlcClient` 側で以下の3点を吸収しています。ライブラリを更新する際は、これらが解消されているかを確認してください。
+
+### 12.1 ビットアクセスは SendCommand で自前実装
+
+finscommandの `read` / `write` はワード単位アクセスのみで、ビット指定ができません。ワードのread-modify-writeで代用すると、同一ワード内の他ビット（例: `D200` のcomplete/ok/error）を設備側が同時に書き換えた場合に競合します。
+
+そのため `PlcClient.read_bit` / `write_bit` は、finscommandの `SendCommand` を使ってFINSのビットアクセスコマンド（コマンドコード `01 01` / `01 02`）を直接送信しています。使用しているビットアクセス用メモリエリアコードは以下です。
+
+| エリア | コード |
+|---|---|
+| CIO | 0x30 |
+| W | 0x31 |
+| H | 0x32 |
+| A | 0x33 |
+| D | 0x02 |
+| E0〜 | 0x20 + バンク番号 |
+
+### 12.2 接続先ポートの上書き
+
+finscommandは接続先UDPポートが9600固定です（コンストラクタで指定不可）。`PlcClient.connect` で `client.addr = (host, port)` により `settings/plc_settings.yaml` の `connection.port` を反映しています。
+
+### 12.3 `__del__` のタイポバグ回避
+
+finscommand 0.1.3 の `fins.__del__` には `self.sock.cloase()` というタイポがあり（正しくは `close()`）、オブジェクト破棄のたびに `AttributeError` が発生します。プログラムは停止しませんが、stderrに `Exception ignored` 警告が出続け、ソケットも明示的に閉じられません。
+
+`PlcClient.__init__` 内の `_FinsUdpClient`（finsのサブクラス）で `__del__` を正しい実装に上書きして回避しています。上流リポジトリ（https://github.com/OkitaSystemDesign/finscommand ）へのissue報告を予定しています。上流で修正された場合もこのサブクラスは同じ動作をするだけなので、残しておいて問題ありません。
