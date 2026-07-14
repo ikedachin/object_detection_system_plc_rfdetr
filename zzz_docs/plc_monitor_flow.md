@@ -11,7 +11,8 @@ PLC実機がない開発・確認環境では、FastAPI製のダミーPLCサー�
 | ファイル | 役割 |
 |---|---|
 | `settings/plc_settings.yaml` | PLCまたはダミーPLCサーバーの有効化、接続先、監視ビット、結果ビットを定義 |
-| `plc_test_server.py` | ダミーPLCサーバー。HTTP APIと簡易Web画面でビット状態を保持・操作 |
+| `plc_test_server.py` | ダミーPLCサーバー。HTTP APIと簡易Web画面でビット状態を保持・操作。`plc.enabled: true` のときは実PLCへのブリッジ（操作盤）として動作 |
+| `object_detection_system/checker/applications/plc_client.py` | OMRON FINS/UDPクライアント（finscommandアダプタ）。plc_monitorとplc_test_serverの両方から使用 |
 | `object_detection_system/checker/applications/plc_monitor.py` | PLC監視本体。監視ビットをポーリングし、ON検知時にcheckerの判定処理を実行 |
 | `object_detection_system/checker/apps.py` | Django runserver起動時にPLC監視スレッドを起動 |
 | `object_detection_system/checker/checker_consumers.py` | WebSocketでchecker画面へPLCトリガー判定結果を通知（PLCへの書き込みは行わない） |
@@ -119,6 +120,16 @@ checker側の監視スレッドはダミーPLCサーバーへ以下のHTTPアク
 
 PLC監視は常時接続ではなく、ポーリングごとのHTTPアクセスです。そのため、再接続専用の処理はありません。
 
+## 7.5 ブリッジモード（plc.enabled: true かつ test_server.enabled: true）
+
+`plc.enabled: true` の状態でテストサーバーを起動すると、テストサーバーはブリッジモードで動作します。
+
+- 画面・APIのビット読み書きは、メモリ上の辞書ではなく `connection` の実PLCへFINS/UDPで転送されます（`plc_client.py` の `PlcClient` を使用）。
+- PLC監視スクリプトはテストサーバーを経由せず、実PLCを直接ポーリングします。テストサーバーは実PLCのビットを手動操作・確認する操作盤という位置づけです。
+- 起動時に初期状態の書き込みは行いません。`Result Reset` を押したときだけ `trigger=OFF / complete=ON / ok=OFF / error=OFF` が実PLCへ書き込まれます。
+- FINS/UDPアクセスはロックで直列化されており、複数のHTTPリクエストが同時に来てもPLCへのコマンドは1つずつ送信されます。
+- 画面ヘッダーに「実PLCブリッジモード」と表示されます。操作は実PLCへ即時反映されるため、設備稼働中の使用には注意してください。
+
 ## 8. 結果ビットの状態遷移
 
 ```mermaid
@@ -193,7 +204,7 @@ PLC監視には2種類の二重起動防止があります。
 
 ## 12. 実PLC通信ライブラリ（finscommand）と適用中のワークアラウンド
 
-実PLCとのFINS/UDP通信には、PyPI公開パッケージの [finscommand](https://pypi.org/project/finscommand/)（0.1.3）を使用しています。`checker/applications/plc_monitor.py` の `PlcClient` がアダプタです。
+実PLCとのFINS/UDP通信には、PyPI公開パッケージの [finscommand](https://pypi.org/project/finscommand/)（0.1.3）を使用しています。`checker/applications/plc_client.py` の `PlcClient` がアダプタです（plc_monitorとplc_test_serverの両方から使用するため、Django非依存の独立モジュールにしています）。
 
 finscommandをそのまま使わず、`PlcClient` 側で以下の3点を吸収しています。ライブラリを更新する際は、これらが解消されているかを確認してください。
 

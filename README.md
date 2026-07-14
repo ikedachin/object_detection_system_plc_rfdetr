@@ -284,9 +284,10 @@ result_signal:
 
 - `plc.enabled` はPLC通信のON/OFFです。PLCなしで画面やDjango側をテストする場合は `false`、実機PLCへ接続する場合は `true` にします。
 - `test_server.enabled` はFastAPI製のダミーPLCサーバーを使うかどうかの設定です。`plc.enabled: false` かつ `test_server.enabled: true` の場合、PLC監視スクリプトと `PLC結果リセット` は実PLCではなく `test_server.base_url` へHTTPでアクセスします。
+- `plc.enabled: true` かつ `test_server.enabled: true` の場合はブリッジモードです。PLC監視スクリプトは実PLCへ直接アクセスし、テストサーバーの画面・APIの操作はメモリではなく実PLCのビットへ直接読み書きされます（実PLCの操作盤として動作）。ブラウザ操作がそのまま実PLCに書き込まれるため、設備稼働中の使用には注意してください。
 - `plc.enabled: false` かつ `test_server.enabled: false` の場合、PLC監視スクリプトはPLCへ接続せず終了します。画面右上の `PLC結果リセット` もPLC書き込みをスキップして成功扱いにします。
 - 実PLCとのFINS/UDP通信には [finscommand](https://pypi.org/project/finscommand/)（PyPI公開パッケージ）を使用します。通常の依存関係インストール（`uv sync` または `pip install -r requirements.txt`）に含まれるため、追加のインストール作業は不要です。
-- ビットの読み書きはFINSのビットアクセスコマンド（メモリエリアコード: CIO=0x30, W=0x31, H=0x32, A=0x33, D=0x02）で行います。対応エリアは `checker/applications/plc_monitor.py` の `PlcClient` を参照してください。
+- ビットの読み書きはFINSのビットアクセスコマンド（メモリエリアコード: CIO=0x30, W=0x31, H=0x32, A=0x33, D=0x02）で行います。対応エリアは `checker/applications/plc_client.py` の `PlcClient` を参照してください。
 - finscommand 0.1.3 の既知の問題（ポート9600固定、`__del__` のタイポ）は `PlcClient` 側で回避しています。詳細は `zzz_docs/plc_monitor_flow.md` の「実PLC通信ライブラリ（finscommand）と適用中のワークアラウンド」を参照してください。
 - `monitor` は現場スイッチONで立つ監視対象ビットです。上記例では `W100.00` を監視します。
 - 使用ビットにはWエリアを使います。DMエリアは電源断後も値を保持するため、電源再投入時に古いtrigger/結果ビットが残り、設備が古い結果を再処理する危険があります。Wエリアは通常保持されませんが、PLC側でIOM Holdを設定すると保持されるため、IOM Holdは無効にしてください。
@@ -360,6 +361,23 @@ http://127.0.0.1:8010/
 ```
 
 この状態で別ターミナルからPLC監視コマンドを起動すると、監視コマンドはFastAPIサーバーのビット状態をPLCメモリとして扱います。
+
+#### ブリッジモード（実PLCの操作盤として使う）
+
+`plc.enabled: true` のままテストサーバーを起動すると、テストサーバーはブリッジモードで動作します。
+
+```yaml
+plc:
+  enabled: true
+
+test_server:
+  enabled: true
+```
+
+- 画面・APIのビット読み書きは、メモリ上の辞書ではなく `connection` で指定した実PLCへFINS/UDPで転送されます。
+- PLC監視スクリプトは（テストサーバーを経由せず）実PLCを直接ポーリングします。テストサーバーは実PLCのビットを手動操作・確認するための操作盤になります。
+- 起動時に初期状態の書き込みは行いません（設備の現在状態を壊さないため）。`Result Reset` ボタンを押したときだけ初期状態が書き込まれます。
+- 画面ヘッダーに「実PLCブリッジモード」と表示されます。ボタン操作は実PLCへ即時反映されるため、設備が結線・稼働中の環境では誤操作に注意してください。
 
 ### Webアプリへのアクセス
    - サーバー起動後、ブラウザで次のURLにアクセスしてください：
