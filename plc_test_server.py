@@ -106,6 +106,7 @@ def index():
     with memory_lock:
         bits = dict(sorted(memory.items()))
     labels = {bit_key(sig["area"], sig["word_address"], sig["bit"]): name for name, sig in configured_signals()}
+    trigger_key = configured_keys().get("trigger") or "trigger"
 
     for key, value in bits.items():
         label = labels.get(key, "")
@@ -147,7 +148,7 @@ def index():
       <p>PLC監視スクリプトのテスト用メモリです。</p>
     </div>
     <div class="actions">
-      <button class="primary" onclick="setTrigger()">D100.00 Trigger ON</button>
+      <button class="primary" onclick="setTrigger()">{html.escape(trigger_key)} Trigger ON</button>
       <button onclick="resetResults()">Result Reset</button>
       <button class="danger" onclick="clearAll()">All OFF</button>
       <button onclick="location.reload()">Reload</button>

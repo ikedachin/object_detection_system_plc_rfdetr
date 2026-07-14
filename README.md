@@ -255,35 +255,31 @@ connection:
   timeout: 3.0
 
 monitor:
-  area: "D"
+  area: "W"
   word_address: 100
   bit: 0
   poll_interval_seconds: 1.0
 
 result_signal:
   complete:
-    area: "D"
+    area: "W"
     word_address: 200
     bit: 0
     on_value: 1
     reset_value: 0
   ok:
-    area: "D"
+    area: "W"
     word_address: 200
     bit: 1
     ok_value: 1
     ng_value: 0
     reset_value: 0
   error:
-    area: "D"
+    area: "W"
     word_address: 200
     bit: 2
     on_value: 1
     reset_value: 0
-  reset_by_equipment: true
-
-behavior:
-  reset_value: 0
 ```
 
 - `plc.enabled` はPLC通信のON/OFFです。PLCなしで画面やDjango側をテストする場合は `false`、実機PLCへ接続する場合は `true` にします。
@@ -292,12 +288,15 @@ behavior:
 - 実PLCとのFINS/UDP通信には [finscommand](https://pypi.org/project/finscommand/)（PyPI公開パッケージ）を使用します。通常の依存関係インストール（`uv sync` または `pip install -r requirements.txt`）に含まれるため、追加のインストール作業は不要です。
 - ビットの読み書きはFINSのビットアクセスコマンド（メモリエリアコード: CIO=0x30, W=0x31, H=0x32, A=0x33, D=0x02）で行います。対応エリアは `checker/applications/plc_monitor.py` の `PlcClient` を参照してください。
 - finscommand 0.1.3 の既知の問題（ポート9600固定、`__del__` のタイポ）は `PlcClient` 側で回避しています。詳細は `zzz_docs/plc_monitor_flow.md` の「実PLC通信ライブラリ（finscommand）と適用中のワークアラウンド」を参照してください。
-- `monitor` は現場スイッチONで立つ監視対象ビットです。上記例では `D100.00` を監視します。
+- `monitor` は現場スイッチONで立つ監視対象ビットです。上記例では `W100.00` を監視します。
+- 使用ビットにはWエリアを使います。DMエリアは電源断後も値を保持するため、電源再投入時に古いtrigger/結果ビットが残り、設備が古い結果を再処理する危険があります。Wエリアは通常保持されませんが、PLC側でIOM Holdを設定すると保持されるため、IOM Holdは無効にしてください。
+- PLC監視は起動インターロック付きです。アプリ起動後に一度 `trigger=OFF` を確認するまでトリガーを受け付けず、その後の `trigger` のOFF→ON（立ち上がりエッジ）だけで検査を開始します。起動時に古い `trigger=ON` が残っていても自動実行されません。
+- PLC結果ビットへの書き込みはPLC監視（`plc_monitor.py`）に一本化しています。Web画面の `snapButton` による手動検査はPLCへ書き込みません。
 - `result_signal.complete` は次トリガー許可ビットです。初期状態とNG/処理エラー時にON、判定実行中とOK時にOFFになります。
 - `result_signal.ok` はOK通知ビットです。判定OK時にONになります。設備側はこのONを確認して設備を動かした後、初期状態へ戻してください。
 - `result_signal.error` はNGまたは処理エラー通知ビットです。判定NG、カメラ取得、モデル、推論などで判定処理自体が失敗した場合にONになります。
 - 初期状態は `trigger=OFF`、`complete=ON`、`ok=OFF`、`error=OFF` です。`trigger=OFF` かつ `complete=ON` のときだけ新しいトリガーを受け付けます。
-- `trigger` を検知した直後に、二重起動防止のため `trigger`、`complete`、`ok`、`error` をすべてOFFにしてからsnap/推論処理を実行します。
+- `trigger` の立ち上がりを検知した直後に、二重起動防止のため `trigger`、`complete`、`ok`、`error` をすべてOFFにしてからsnap/推論処理を実行します。
 - 判定OK時は `ok=ON`、`complete=OFF`、`error=OFF` にします。設備側がOKを確認して設備を動かした後、初期状態へ戻す前提です。
 - 判定NG時は `error=ON`、`complete=ON`、`ok=OFF` にします。この状態では次の `trigger` を受け付けられます。
 - 判定処理中はPLCポーリングを停止します。Web画面の `snapButton` とPLC監視が同時に判定処理を走らせないよう、共通ロックで排他制御しています。
@@ -354,7 +353,7 @@ uvを使う場合:
 uv run python plc_test_server.py
 ```
 
-ブラウザで以下にアクセスすると、簡易画面から `D100.00` のトリガーON、結果ビットの確認、結果リセット、全ビットOFFができます。
+ブラウザで以下にアクセスすると、簡易画面から `W100.00` のトリガーON、結果ビットの確認、結果リセット、全ビットOFFができます。
 
 ```text
 http://127.0.0.1:8010/

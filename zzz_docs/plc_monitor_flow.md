@@ -14,7 +14,7 @@ PLC実機がない開発・確認環境では、FastAPI製のダミーPLCサー�
 | `plc_test_server.py` | ダミーPLCサーバー。HTTP APIと簡易Web画面でビット状態を保持・操作 |
 | `object_detection_system/checker/applications/plc_monitor.py` | PLC監視本体。監視ビットをポーリングし、ON検知時にcheckerの判定処理を実行 |
 | `object_detection_system/checker/apps.py` | Django runserver起動時にPLC監視スレッドを起動 |
-| `object_detection_system/checker/checker_consumers.py` | WebSocketでchecker画面へPLCトリガー判定結果を通知 |
+| `object_detection_system/checker/checker_consumers.py` | WebSocketでchecker画面へPLCトリガー判定結果を通知（PLCへの書き込みは行わない） |
 | `object_detection_system/checker/static/checker_index.js` | WebSocket通知を受け取り、判定画像と結果表示を更新 |
 
 ## 3. 現在の設定
@@ -32,24 +32,26 @@ test_server:
   base_url: "http://127.0.0.1:8010"
 
 monitor:
-  area: "D"
+  area: "W"
   word_address: 100
   bit: 0
   poll_interval_seconds: 1.0
 ```
 
-このため、checker側の監視処理は `D100.00` を1秒ごとにHTTPで読み取ります。
+このため、checker側の監視処理は `W100.00` を1秒ごとにHTTPで読み取ります。
 
 ## 4. 使用するビット
 
 | 用途 | ビット | 初期値 | 意味 |
 |---|---:|---:|---|
-| trigger | `D100.00` | OFF | 設備側、またはダミーPLC画面から検査開始を要求するビット |
-| complete | `D200.00` | ON | 次のトリガーを受け付け可能かを示すビット |
-| ok | `D200.01` | OFF | 判定OKを示すビット |
-| error | `D200.02` | OFF | 判定NGまたは処理エラーを示すビット |
+| trigger | `W100.00` | OFF | 設備側、またはダミーPLC画面から検査開始を要求するビット |
+| complete | `W200.00` | ON | 次のトリガーを受け付け可能かを示すビット |
+| ok | `W200.01` | OFF | 判定OKを示すビット |
+| error | `W200.02` | OFF | 判定NGまたは処理エラーを示すビット |
 
 初期状態は `trigger=OFF`、`complete=ON`、`ok=OFF`、`error=OFF` です。
+
+使用エリアはWエリアです。DMエリアはPLCの電源を切っても値を保持するため、電源再投入時に古いtrigger/結果ビットが残る危険があります。Wエリアは通常保持されませんが、IOM Holdを設定すると保持されるため、PLC側でIOM Holdは無効にしてください。
 
 ## 5. 全体フロー
 
@@ -62,12 +64,12 @@ flowchart TD
     D -->|"plc.enabled: false<br/>test_server.enabled: true"| F["ダミーPLCサーバーへHTTP接続"]
     D -->|"両方 false"| G["PLC監視を終了"]
 
-    E --> H["監視ループ開始"]
+    E --> H["起動インターロック<br/>trigger=OFF を確認するまで受付停止"]
     F --> H
     H --> I["poll_interval_seconds ごとに trigger を読取"]
-    I --> J{"trigger は ON?"}
-    J -->|"OFF"| I
-    J -->|"ON"| K{"complete は ON?"}
+    I --> J{"trigger は OFF→ON<br/>（立ち上がりエッジ）?"}
+    J -->|"エッジなし"| I
+    J -->|"立ち上がり"| K{"complete は ON?"}
     K -->|"OFF"| L["trigger を OFF に戻して無視"]
     L --> I
     K -->|"ON"| M["trigger / complete / ok / error を OFF"]
@@ -89,7 +91,7 @@ flowchart TD
 
 ブラウザで `http://127.0.0.1:8010/` を開くと、以下の操作ができます。
 
-- `D100.00 Trigger ON`: `trigger=ON` にして、checkerのPLC監視に検査開始を要求する
+- `W100.00 Trigger ON`: `trigger=ON` にして、checkerのPLC監視に検査開始を要求する
 - `Result Reset`: 初期状態へ戻す
 - `All OFF`: 全ビットをOFFにする
 - 個別ON/OFF: 各ビットを直接操作する
@@ -180,6 +182,9 @@ PLC監視には2種類の二重起動防止があります。
 
 ## 11. 運用上の注意
 
+- PLC結果ビットへの書き込みは `plc_monitor.py` に一本化しています。Web画面の手動検査（`snapButton`）はPLCへ書き込みません。
+- アプリ起動直後は起動インターロックにより、一度 `trigger=OFF` を確認するまでトリガーを受け付けません。起動時に古い `trigger=ON` が残っていても自動実行されません。
+- `trigger` はONレベルではなくOFF→ONの立ち上がりエッジで検知します。ONのまま保持しても再実行されません。
 - `complete=OFF` の状態では、新しい `trigger=ON` は受け付けられません。
 - 判定OK後は `complete=OFF` になるため、設備側または画面の `PLC結果リセット` で初期状態へ戻す必要があります。
 - 判定NGまたは処理エラー後は `complete=ON` になるため、次のトリガーを受け付け可能です。
@@ -194,7 +199,7 @@ finscommandをそのまま使わず、`PlcClient` 側で以下の3点を吸収�
 
 ### 12.1 ビットアクセスは SendCommand で自前実装
 
-finscommandの `read` / `write` はワード単位アクセスのみで、ビット指定ができません。ワードのread-modify-writeで代用すると、同一ワード内の他ビット（例: `D200` のcomplete/ok/error）を設備側が同時に書き換えた場合に競合します。
+finscommandの `read` / `write` はワード単位アクセスのみで、ビット指定ができません。ワードのread-modify-writeで代用すると、同一ワード内の他ビット（例: `W200` のcomplete/ok/error）を設備側が同時に書き換えた場合に競合します。
 
 そのため `PlcClient.read_bit` / `write_bit` は、finscommandの `SendCommand` を使ってFINSのビットアクセスコマンド（コマンドコード `01 01` / `01 02`）を直接送信しています。使用しているビットアクセス用メモリエリアコードは以下です。
 

@@ -3,8 +3,6 @@ import asyncio
 import datetime
 import json
 
-from asgiref.sync import async_to_sync, sync_to_async
-from channels.layers import get_channel_layer
 from channels.generic.websocket import AsyncWebsocketConsumer
 from checker.applications.snap_service import (
     ensure_camera_initialized,
@@ -18,23 +16,6 @@ from checker.applications.snap_service import (
 #############################################################
 NOW = datetime.datetime.now()
 FRAME_STILL = None
-
-
-async def run_confirm_snap_request(write_plc_signals=True):
-    snap_result = await run_snap_backend()
-    if write_plc_signals:
-        from checker.applications.plc_monitor import write_snap_result_signals
-
-        try:
-            await sync_to_async(write_snap_result_signals, thread_sensitive=False)(snap_result)
-        except Exception:
-            import traceback
-            traceback.print_exc()
-    return snap_result
-
-
-def run_confirm_snap_request_sync(write_plc_signals=True):
-    return async_to_sync(run_confirm_snap_request)(write_plc_signals=write_plc_signals)
 
 
 #############################################################
@@ -90,19 +71,15 @@ class Confirm(AsyncWebsocketConsumer):
         print(f'Bytes data: {bytes_data}')
         print('Starting inference...')
 
+        # PLC結果ビットの書き込みはplc_monitor.pyに一本化しているため、ここではPLCへ書き込まない
         try:
-            snap_result = await run_confirm_snap_request()
+            snap_result = await run_snap_backend()
             await self.send(bytes_data=snap_result.image_bytes)
             await self.send(text_data=snap_result_to_json(snap_result))
         except Exception as e:
             import traceback
-            from checker.applications.plc_monitor import write_snap_error_signals
 
             traceback.print_exc()
-            try:
-                await sync_to_async(write_snap_error_signals, thread_sensitive=False)()
-            except Exception:
-                traceback.print_exc()
             await self.send(text_data=json.dumps({
                 'error': str(e),
                 'timestamp': NOW.isoformat()
