@@ -27,6 +27,7 @@ def quality_verify(result_dict):
 
 # =================================================================
 # 判定ロジック例
+# object_detection_system/checker/applications/snap_service.pyでインポートして使うことを想定しています。
 # =================================================================
 # book == 6の時に合格
 def quality_verify_book(result_dict):
