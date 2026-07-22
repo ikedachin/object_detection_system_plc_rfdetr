@@ -233,7 +233,7 @@ async def run_snap_backend() -> SnapResult:
             predicted_img = img_array[:pixes['height'], :, :]
             image_bytes = encode_png_from_rgb_array(predicted_img)
 
-            result = quality_verify.quality_verify_thr17(result_dict)
+            result = quality_verify.quality_verify(result_dict)
             print(f'Approval status: {result}')
 
             return SnapResult(
