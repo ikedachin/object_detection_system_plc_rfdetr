@@ -1,121 +1,97 @@
 # checkerアプリケーション プログラム設計書
 
+> 対象: `test-plc-server-bridge-to-CJ2` / `b6d2f2f`（2026-07-27確認）
+
 ## 1. システム概要
 
-本アプリは、RF-DETRモデルを用いた物体検出推論・検証を行うDjangoアプリケーションです。  
-プロジェクトごとに学習済みモデル・設定ファイルを選択し、画像推論・結果判定・可視化をサポートします。
+本アプリは、アクティブなプロジェクトと学習モデルを使い、カメラ画像にRF-DETR推論を行って員数条件を判定するDjangoアプリケーションです。手動画面操作とPLCトリガーは、共通の `run_snap_backend()` を使用します。
 
----
+## 2. 処理構成
 
-## 2. 全体フロー図
-
-```
-[プロジェクト選択]
-      ↓
-[設定ファイル・重み選択]
-      ↓
-[推論画像アップロード/選択]
-      ↓
-[RF-DETR推論]
-      ↓
-[判定・可視化]
-      ↓
-[結果表示・保存]
+```mermaid
+flowchart LR
+  UI["checker画面"] --> WS["Confirm WebSocket"]
+  PLC["PLC監視"] --> WS
+  WS --> SNAP["snap_service.run_snap_backend"]
+  SNAP --> CAM["カメラ撮像"]
+  SNAP --> MODEL["RF-DETR推論"]
+  MODEL --> VERIFY["quality_verify"]
+  SNAP --> DB["InferenceResult / DetectedObject"]
+  SNAP --> UI
+  SNAP --> PLC
 ```
 
----
+## 3. HTTP API
 
-## 3. 主要関数・API詳細
+| 経路 | ハンドラー | 役割 |
+|---|---|---|
+| `/checker/` | `checker_index` | プロジェクト、学習モデル、ロード状態を表示 |
+| `/checker/api/get_weight_path/` | `get_weight_path` | 設定名から重みパスを解決 |
+| `/checker/api/set_active_project/` | `set_active_project` | アクティブプロジェクトを変更 |
+| `/checker/api/set_active_training/` | `set_active_training` | アクティブ学習モデルを変更 |
+| `/checker/api/load_model/` | `load_model_for_training` | バックグラウンドでモデルをロード |
+| `/checker/api/check_model_status/` | `check_model_status` | モデルロード状態を返す |
+| `/checker/api/reset_plc_result/` | `reset_plc_result_signals` | PLC結果信号を初期状態へ戻す |
+| `/checker/api/latest_plc_result/` | `latest_plc_result` | PLC監視が保持する直近結果を返す |
 
-### 3.1 ビュー・API
+`get_config_files` はコメントアウトされており、現行URLには公開されていません。
 
-- **checker_index(request)**  
-  プロジェクト・設定ファイル・重みファイルの選択画面を表示。モデルロードも担当。
-- **get_config_files(request)**  
-  プロジェクトIDからmodels配下の設定ファイル（yaml）一覧を返すAPI。
-- **get_weight_path(request)**  
-  プロジェクトID・設定ファイル名から重みファイルパスと存在判定を返すAPI。
+## 4. WebSocket
 
-### 3.2 推論ロジック
+| 経路 | Consumer | 役割 |
+|---|---|---|
+| `/checker/ws/time/` | `CheckerServerTime` | 時刻およびchecker状態通知 |
+| `/checker/ws/confirm/` | `Confirm` | 撮像、推論、判定、画像・JSON結果送信 |
 
-- **detect_objects(img, model, **kwargs)**  
-  画像とモデルを受けてRF-DETR推論を実行。結果画像を保存し、判定ロジックへ渡す。
-- **result_detector(result)**  
-  RF-DETR推論結果からクラスごとの個数を集計し、判定基準に従い合否・詳細を返却。
+`Confirm` 自身はPLC結果ビットを書き込みません。PLCトリガーで実行した場合、`plc_monitor.py` が結果信号を一元管理します。
 
-### 3.3 WebSocket（リアルタイム機能）
+## 5. 推論処理
 
-- **CheckerServerTime(AsyncWebsocketConsumer)**  
-  サーバ時刻の配信。
-- **Confirm(AsyncWebsocketConsumer)**  
-  推論結果のリアルタイム通知等。
+### `run_snap_backend()`
 
----
+1. `snap_lock` を非ブロッキング取得し、二重実行を拒否する。
+2. カメラを初期化し、BGRフレームを取得する。
+3. アクティブプロジェクトとTrainingRunを解決する。
+4. 未ロードの場合は学習成果物からモデルをロードする。
+5. TrainingRunの推論設定YAMLを読み込む。
+6. `detect_objects()` で推論・可視化・DB保存する。
+7. `quality_verify.quality_verify()` で合否を決定する。
+8. PNG画像とJSON化可能な結果を `SnapResult` として返す。
 
-## 4. 各関数の詳細説明
+### `detect_objects(img, model, project=None, training_run=None, **kwargs)`
 
-### checker_index(request)
-- **目的**: 推論用プロジェクト・設定・重み選択画面の表示
-- **処理**:
-  1. プロジェクト一覧・アクティブプロジェクト取得
-  2. 設定ファイル・重みファイルの存在確認
-  3. RF-DETRモデルのロード
-  4. テンプレートへデータ渡し
-- **返却**: HTML
+- RF-DETRの `model.predict(image, threshold=...)` を呼び出します。
+- 検出結果をクラス別に集計し、BBoxとラベルをPillowで描画します。
+- `detect/YYYYMMDD/HH_MM_SS/predict/latest.png` に結果画像を保存します。
+- projectとtraining_runが指定された場合、`InferenceResult` と `DetectedObject` をDBへ保存します。
+- 戻り値は `(result_dict, annotated_image_array)` です。
 
-### get_config_files(request)
-- **目的**: 設定ファイル一覧取得API
-- **処理**:
-  1. プロジェクトIDからmodels配下を再帰検索
-  2. yamlファイル一覧を返却
-- **返却**: JSON
+## 6. 合否判定
 
-### get_weight_path(request)
-- **目的**: 重みファイルパス・存在判定API
-- **処理**:
-  1. プロジェクトID・設定ファイル名から重みパス生成
-  2. ファイル存在確認・モデルロード
-- **返却**: JSON
+現行で `snap_service.py` が使用するのは `quality_verify(result_dict)` です。
 
-### detect_objects(img, model, **kwargs)
-- **目的**: RF-DETR推論実行
-- **処理**:
-  1. 推論用保存ディレクトリ生成
-  2. RF-DETRモデルで推論
-  3. 結果画像保存
-  4. 判定ロジックへ渡す
-- **返却**: 判定結果（result_detectorの返り値）
+- 検出クラスが1種類だけの場合: OK
+- 未検出または2種類以上の場合: NG
 
-### result_detector(result)
-- **目的**: 推論結果の合否判定
-- **処理**:
-  1. クラスごとの個数集計
-  2. 判定基準（例: s=8個, 他=9個）で合否判定
-- **返却**: (合否, クラス名, 個数, 結果画像)
+`quality_verify_common`、`quality_verify_book`、`quality_verify_book_pen` は差し替え用の例です。設定ファイルや管理画面からの動的切替は実装されていません。
 
----
+## 7. モデル状態
 
-## 5. クラス図（簡易）
+- モデル本体、ロード中フラグ、ロード済みTrainingRun IDは `checker.views` のプロセス内グローバル変数です。
+- モデルロードはスレッドで実行されます。
+- アクティブTrainingRunとロード済みIDが異なる場合、推論を拒否します。
+- 複数Djangoプロセス間ではモデル状態を共有しません。
 
-```
-Project
-  ↑
-checker_index, get_config_files, get_weight_path
-  ↓
-detect_objects
-  ↓
-result_detector
-```
+## 8. PLC連携
 
----
+PLCのアドレス、起動インターロック、結果信号、ダミー／実PLC／ブリッジモードは `zzz_docs/plc_monitor_flow.md` を参照してください。
 
-## 6. 注意事項・設計上のポイント
+## 9. 関連実装
 
-- プロジェクトごとに重み・設定ファイルを分離管理
-- RF-DETRモデルの動的ロードに対応
-- 推論結果は合否判定・画像保存・可視化まで一貫
-- WebSocketによるリアルタイム通知も実装
-
----
-
-（本設計書は2025年7月25日現在の実装に基づく）
+- `object_detection_system/checker/views.py`
+- `object_detection_system/checker/checker_consumers.py`
+- `object_detection_system/checker/applications/snap_service.py`
+- `object_detection_system/checker/applications/detect.py`
+- `object_detection_system/checker/applications/quality_verify.py`
+- `object_detection_system/checker/applications/plc_monitor.py`
+- `object_detection_system/checker/applications/plc_client.py`
