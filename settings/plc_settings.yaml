@@ -1,3 +1,9 @@
+# enabledの組み合わせによる動作:
+#   plc: false / test_server: true  -> ダミーモード。PLC監視もテストサーバー画面もメモリ上のビットを使う
+#   plc: true  / test_server: false -> 実PLCモード。PLC監視はconnectionの実PLCへ直接アクセス
+#   plc: true  / test_server: true  -> ブリッジモード。PLC監視は実PLCへ直接アクセスし、
+#                                      テストサーバー画面の操作も実PLCのビットへ直接読み書きされる（操作盤として動作）
+#   plc: false / test_server: false -> PLC監視は無効
 plc:
   enabled: false
 
@@ -20,33 +26,31 @@ connection:
   pc_node: 25
   timeout: 3.0
 
+# Wエリアは電源断で値が保持されない（IOM Hold無効が前提）ため、
+# 電源再投入時に古いtrigger/結果ビットが残らない
 monitor:
-  area: "D"
+  area: "W"
   word_address: 100
   bit: 0
   poll_interval_seconds: 1.0
 
 result_signal:
   complete:
-    area: "D"
+    area: "W"
     word_address: 200
     bit: 0
     on_value: 1
     reset_value: 0
   ok:
-    area: "D"
+    area: "W"
     word_address: 200
     bit: 1
     ok_value: 1
     ng_value: 0
     reset_value: 0
   error:
-    area: "D"
+    area: "W"
     word_address: 200
     bit: 2
     on_value: 1
     reset_value: 0
-  reset_by_equipment: true
-
-behavior:
-  reset_value: 0

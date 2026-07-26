@@ -1,71 +1,59 @@
+# RF-DETRモデルの推論設定
 
-## RF-DETRモデルの推論設定
----
-RF-DETR物体検出の設定は `settings/rfdetr_detect.yaml` で管理されています。初期値は以下の設定が含まれます：
+> 対象: `test-plc-server-bridge-to-CJ2` / `b6d2f2f`（2026-07-27確認）
+
+## 1. 設定ファイル
+
+初期テンプレートは `settings/rfdetr_detect.yaml` です。学習完了後は、各 `TrainingRun.config_yaml_path` が示すYAMLをcheckerが使用します。
 
 ```yaml
-RF-DETR:
+RF_DETR:
+  model_path:
+  model_name: Roboflow/rf-detr-large
+  num_queries:
+  num_classes:
+  num_select:
+  class_names: []
   detect_config:
-    conf: 0.45  # 信頼度閾値
-    save: False  # 画像保存
-    save_txt: True  # テキストファイルに結果保存
-    save_conf: True  # 信頼度スコア保存
-    line_width: 2  # バウンディングボックスの線幅
-    exist_ok: True  # 既存結果ディレクトリの上書き許可
-    verbose: False  # 詳細出力の抑制
-
-image_size:
-  type: SD480p  # 推論時の画像サイズ（640x480px）
+    conf: 0.45
+    verbose: false
 ```
-<br>
 
----
+## 2. 項目
 
-#### 他に利用できる推論用の引数の設定（上級者向け）
-これらを上記の`settings.rfdetr_detect.yaml`に追記していただくことも可能です。
+| 項目 | 型 | 役割 |
+|---|---|---|
+| `RF_DETR.model_path` | 文字列またはnull | 学習済みチェックポイント。通常はTrainingRun側で解決 |
+| `RF_DETR.model_name` | 文字列 | RF-DETRモデル種別 |
+| `RF_DETR.num_queries` | 整数またはnull | モデル生成時のquery数 |
+| `RF_DETR.num_classes` | 整数またはnull | 学習クラス数 |
+| `RF_DETR.num_select` | 整数またはnull | 選択候補数 |
+| `RF_DETR.class_names` | 文字列配列 | クラスIDを表示名へ変換する一覧 |
+| `RF_DETR.detect_config.conf` | 0～1の数値 | 検出信頼度の下限。既定値0.45 |
+| `RF_DETR.detect_config.verbose` | 真偽値 | 推論処理の詳細出力用拡張値 |
 
-参照url: https://rfdetr.roboflow.com/latest/
+## 3. 現行推論APIへの渡し方
 
-- **推論引数:**
+`checker/applications/detect.py` は次の呼出しを行います。
 
-| 引数 | タイプ	| デフォルト | 説明 |
-| --- | --- | --- | --- |
-| source | str,url または ndarray | 'rfdetr/assets' | 推論のデータソースを指定。画像パス、ビデオファイル、ディレクトリ、URL、ndarray。本プログラムではndarray |
-| conf | float | 0.25 | 検出の最小信頼度しきい値の設定。この閾値以下の信頼度で検出されたオブジェクトは無視し、誤検出を減らす。 | 
-| iou | float | 0.7 | Non-Maximum Suppression (NMS)のIntersection Over Union(IoU)しきい値。値が低いほど、重複するボックスが排除され、重複減。 | 
-| imgsz | int または tuple | 640 | 推論のための画像サイズを定義。単一の整数値 640 正方形にリサイズする場合、または（高さ、幅）のタプルを使用。本プログラムでは640 | 
-| rect | bool | True | Trueは画像の短辺をストライドで割り切れるまで最小限にパディングし、推論速度を向上。Falseにすると、推論中に画像を正方形にパディング。| 
-| half | bool | False | 半精度(FP16)推論が可能。GPUでのモデル推論を、精度への影響を最小限に抑えながら高速化。今回はGPUを使用しない。 | 
-| device | str | None | 推論を行うデバイスを指定（例． cpu, cuda:0 または 0）.CPU 、特定のGPU 、またはモデル実行用の他のコンピュート・デバイスを選択できる。 | 
-| batch | int | 1 | 推論のバッチ・サイズを指定（ソースが ディレクトリ、ビデオファイル、または .txt ファイル）。今回は一枚ずつの処理なのでデフォルト設定。 | 
-| max_det | int | 300 | 画像あたりの最大検出数。1回の推論でモデルが検出できるオブジェクトの最大値。 |
-| vid_stride | int | 1 | ビデオ入力の時間的な解像度を犠牲にして処理を高速化するために、ビデオのフレームをいくつスキップするかを指定。1の値はすべてのフレームを処理し、それ以上の値はフレームをスキップする。 |
-| stream_buffer | bool | False | ビデオストリームの受信フレームバッファに貯めるか否かを指定。Falseはリアルタイム・アプリケーション用に最適。Trueの場合、推論のFPSがストリームのFPSより低い場合、遅延が発生。|
-| visualize | bool | False | 推論中にモデルの特徴量マップを可視化。モデルが何を「見て」いるのかを確認できる。デバッグやモデルの解釈用。 |
-| augment | bool | False | 予測に対するテスト時間拡張（TTA）を可能にし、推論速度を犠牲にすることで検出のロバスト性を向上させる可能性がある。 |
-| agnostic_nms | bool | False | 異なるクラスのオーバーラップしたボックスをマージ。クラスにとらわれない非最大抑制（NMS）を有効化。クラスの重複が一般的なマルチクラス検出シナリオに有効 |
-| classes | list[int] | None | 指定されたクラスに属する物体のみを検出。複数クラスの検出タスクにおいて、必要なものだけに絞り込む時に利用。 |
-| retina_masks | bool | False | 高解像度のセグメンテーションマスクを返す。。返されるマスク (masks.data)が有効なら、元の画像サイズと一致。無効にすると、推論時に使われた画像サイズ。
-| embed | list[int] | None | 特徴ベクトルまたは埋め込みを抽出するレイヤを指定します。クラスタリングや類似検索のような下流のタスクに便利です。 |
-| project | str | None | saveが有効の時、推論結果を出力するディレクトリの名前。 |
-| name | str | None | saveが有効の時、projectディレクトリの中のサブディレクトリの名前を指定。 |
-| stream | bool | False | すべてのフレームを一度にメモリにロードせず、Resultsオブジェクトのジェネレーターを返すことで、長いビデオや多数の画像のメモリ効率的な処理を可能にする。
-| verbose | bool | True | ターミナルに詳細な推論ログを表示。 | 
+```python
+detections = model.predict(image, threshold=threshold)
+```
 
-<br>
+`threshold` は `detect_config.conf` を使用します。`class_names` は検出結果にクラス名が含まれない場合の表示名解決に使います。
 
-- **可視化の引数：**
+## 4. 注意事項
 
-| 議論 | タイプ | デフォルト	| 説明 |
-| --- | --- | --- | --- |
-| show | bool | False | もし True注釈付きの画像やビデオをウィンドウに表示。開発中やテスト中の即時の視覚的フィードバックに便利。| 
-| save | bool | False or True | 注釈付きの画像や動画をファイルに保存。文書化、デフォルトは、CLI の場合は True、Python の場合は False。 |
-| save_frames | bool | False | 動画を処理する際、個々のフレームを画像として保存。|
-| save_txt | bool | False | 検出結果をテキストファイルに保存します。 [class] [x_center] [y_center] [width] [height] [confidence]|
-| save_conf | bool | False | Trueの場合、保存されたテキストファイルに信頼度スコアが含まれる。 | 
-| save_crop | bool | False | 検出画像をトリミングして保存。 | 
-| show_labels | bool | True | 視覚出力に各検出のラベルを表示。 |
-| show_conf | bool | True | 各検出の信頼スコアがラベルと一緒に表示。 |
-| show_boxes | bool | True | 検出されたオブジェクトの周囲にバウンディングボックスを描画。 |
-| line_width | None or int | None | バウンディングボックスの線幅を指定。 | 
+- 旧版に記載されていた `iou`、`imgsz`、`rect`、`save_txt`、`save_conf`、`retina_masks` 等はUltralytics系の引数であり、現行 `RFDETRBase.predict()` へそのまま渡す仕様ではありません。
+- 未対応のキーを追加しても、現行 `detect_objects()` が参照しない限り動作は変わりません。
+- 閾値を下げると検出数と誤検出が増え、上げると見逃しが増えます。変更後は実画像で員数判定を確認してください。
+- `model_path` と `class_names` は学習成果物と一致させてください。
+- パスが他PCのWindows絶対パスの場合は、システムが現在のプロジェクトルートへの再基準化を試みます。
 
+## 5. 変更確認
+
+1. checker画面で対象プロジェクトと学習モデルを有効化する。
+2. モデルロード完了を確認する。
+3. 既知のOK画像、NG画像、未検出画像、複数クラス画像で検査する。
+4. 結果画像、クラス別件数、合否を確認する。
+5. PLC運用時は画面確認後にダミーモードで信号を確認し、最後に実PLCで受入試験する。

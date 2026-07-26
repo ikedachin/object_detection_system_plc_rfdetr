@@ -11,10 +11,11 @@ PLC実機がない開発・確認環境では、FastAPI製のダミーPLCサー�
 | ファイル | 役割 |
 |---|---|
 | `settings/plc_settings.yaml` | PLCまたはダミーPLCサーバーの有効化、接続先、監視ビット、結果ビットを定義 |
-| `plc_test_server.py` | ダミーPLCサーバー。HTTP APIと簡易Web画面でビット状態を保持・操作 |
+| `plc_test_server.py` | ダミーPLCサーバー。HTTP APIと簡易Web画面でビット状態を保持・操作。`plc.enabled: true` のときは実PLCへのブリッジ（操作盤）として動作 |
+| `object_detection_system/checker/applications/plc_client.py` | OMRON FINS/UDPクライアント（finscommandアダプタ）。plc_monitorとplc_test_serverの両方から使用 |
 | `object_detection_system/checker/applications/plc_monitor.py` | PLC監視本体。監視ビットをポーリングし、ON検知時にcheckerの判定処理を実行 |
 | `object_detection_system/checker/apps.py` | Django runserver起動時にPLC監視スレッドを起動 |
-| `object_detection_system/checker/checker_consumers.py` | WebSocketでchecker画面へPLCトリガー判定結果を通知 |
+| `object_detection_system/checker/checker_consumers.py` | WebSocketでchecker画面へPLCトリガー判定結果を通知（PLCへの書き込みは行わない） |
 | `object_detection_system/checker/static/checker_index.js` | WebSocket通知を受け取り、判定画像と結果表示を更新 |
 
 ## 3. 現在の設定
@@ -32,24 +33,26 @@ test_server:
   base_url: "http://127.0.0.1:8010"
 
 monitor:
-  area: "D"
+  area: "W"
   word_address: 100
   bit: 0
   poll_interval_seconds: 1.0
 ```
 
-このため、checker側の監視処理は `D100.00` を1秒ごとにHTTPで読み取ります。
+このため、checker側の監視処理は `W100.00` を1秒ごとにHTTPで読み取ります。
 
 ## 4. 使用するビット
 
 | 用途 | ビット | 初期値 | 意味 |
 |---|---:|---:|---|
-| trigger | `D100.00` | OFF | 設備側、またはダミーPLC画面から検査開始を要求するビット |
-| complete | `D200.00` | ON | 次のトリガーを受け付け可能かを示すビット |
-| ok | `D200.01` | OFF | 判定OKを示すビット |
-| error | `D200.02` | OFF | 判定NGまたは処理エラーを示すビット |
+| trigger | `W100.00` | OFF | 設備側、またはダミーPLC画面から検査開始を要求するビット |
+| complete | `W200.00` | ON | 次のトリガーを受け付け可能かを示すビット |
+| ok | `W200.01` | OFF | 判定OKを示すビット |
+| error | `W200.02` | OFF | 判定NGまたは処理エラーを示すビット |
 
 初期状態は `trigger=OFF`、`complete=ON`、`ok=OFF`、`error=OFF` です。
+
+使用エリアはWエリアです。DMエリアはPLCの電源を切っても値を保持するため、電源再投入時に古いtrigger/結果ビットが残る危険があります。Wエリアは通常保持されませんが、IOM Holdを設定すると保持されるため、PLC側でIOM Holdは無効にしてください。
 
 ## 5. 全体フロー
 
@@ -62,12 +65,12 @@ flowchart TD
     D -->|"plc.enabled: false<br/>test_server.enabled: true"| F["ダミーPLCサーバーへHTTP接続"]
     D -->|"両方 false"| G["PLC監視を終了"]
 
-    E --> H["監視ループ開始"]
+    E --> H["起動インターロック<br/>trigger=OFF を確認するまで受付停止"]
     F --> H
     H --> I["poll_interval_seconds ごとに trigger を読取"]
-    I --> J{"trigger は ON?"}
-    J -->|"OFF"| I
-    J -->|"ON"| K{"complete は ON?"}
+    I --> J{"trigger は OFF→ON<br/>（立ち上がりエッジ）?"}
+    J -->|"エッジなし"| I
+    J -->|"立ち上がり"| K{"complete は ON?"}
     K -->|"OFF"| L["trigger を OFF に戻して無視"]
     L --> I
     K -->|"ON"| M["trigger / complete / ok / error を OFF"]
@@ -89,7 +92,7 @@ flowchart TD
 
 ブラウザで `http://127.0.0.1:8010/` を開くと、以下の操作ができます。
 
-- `D100.00 Trigger ON`: `trigger=ON` にして、checkerのPLC監視に検査開始を要求する
+- `W100.00 Trigger ON`: `trigger=ON` にして、checkerのPLC監視に検査開始を要求する
 - `Result Reset`: 初期状態へ戻す
 - `All OFF`: 全ビットをOFFにする
 - 個別ON/OFF: 各ビットを直接操作する
@@ -116,6 +119,16 @@ checker側の監視スレッドはダミーPLCサーバーへ以下のHTTPアク
 - ダミーPLCサーバーを再起動すると、次回以降のポーリングで自然に復帰する
 
 PLC監視は常時接続ではなく、ポーリングごとのHTTPアクセスです。そのため、再接続専用の処理はありません。
+
+## 7.5 ブリッジモード（plc.enabled: true かつ test_server.enabled: true）
+
+`plc.enabled: true` の状態でテストサーバーを起動すると、テストサーバーはブリッジモードで動作します。
+
+- 画面・APIのビット読み書きは、メモリ上の辞書ではなく `connection` の実PLCへFINS/UDPで転送されます（`plc_client.py` の `PlcClient` を使用）。
+- PLC監視スクリプトはテストサーバーを経由せず、実PLCを直接ポーリングします。テストサーバーは実PLCのビットを手動操作・確認する操作盤という位置づけです。
+- 起動時に初期状態の書き込みは行いません。`Result Reset` を押したときだけ `trigger=OFF / complete=ON / ok=OFF / error=OFF` が実PLCへ書き込まれます。
+- FINS/UDPアクセスはロックで直列化されており、複数のHTTPリクエストが同時に来てもPLCへのコマンドは1つずつ送信されます。
+- 画面ヘッダーに「実PLCブリッジモード」と表示されます。操作は実PLCへ即時反映されるため、設備稼働中の使用には注意してください。
 
 ## 8. 結果ビットの状態遷移
 
@@ -180,8 +193,42 @@ PLC監視には2種類の二重起動防止があります。
 
 ## 11. 運用上の注意
 
+- PLC結果ビットへの書き込みは `plc_monitor.py` に一本化しています。Web画面の手動検査（`snapButton`）はPLCへ書き込みません。
+- アプリ起動直後は起動インターロックにより、一度 `trigger=OFF` を確認するまでトリガーを受け付けません。起動時に古い `trigger=ON` が残っていても自動実行されません。
+- `trigger` はONレベルではなくOFF→ONの立ち上がりエッジで検知します。ONのまま保持しても再実行されません。
 - `complete=OFF` の状態では、新しい `trigger=ON` は受け付けられません。
 - 判定OK後は `complete=OFF` になるため、設備側または画面の `PLC結果リセット` で初期状態へ戻す必要があります。
 - 判定NGまたは処理エラー後は `complete=ON` になるため、次のトリガーを受け付け可能です。
 - ダミーPLCサーバー停止中でもcheckerアプリ全体は停止しません。ただしPLCトリガーは検知できません。
 - `PLC結果リセット` ボタンもダミーPLCサーバーへHTTP書き込みを行うため、サーバー停止中は失敗します。
+
+## 12. 実PLC通信ライブラリ（finscommand）と適用中のワークアラウンド
+
+実PLCとのFINS/UDP通信には、PyPI公開パッケージの [finscommand](https://pypi.org/project/finscommand/)（0.1.3）を使用しています。`checker/applications/plc_client.py` の `PlcClient` がアダプタです（plc_monitorとplc_test_serverの両方から使用するため、Django非依存の独立モジュールにしています）。
+
+finscommandをそのまま使わず、`PlcClient` 側で以下の3点を吸収しています。ライブラリを更新する際は、これらが解消されているかを確認してください。
+
+### 12.1 ビットアクセスは SendCommand で自前実装
+
+finscommandの `read` / `write` はワード単位アクセスのみで、ビット指定ができません。ワードのread-modify-writeで代用すると、同一ワード内の他ビット（例: `W200` のcomplete/ok/error）を設備側が同時に書き換えた場合に競合します。
+
+そのため `PlcClient.read_bit` / `write_bit` は、finscommandの `SendCommand` を使ってFINSのビットアクセスコマンド（コマンドコード `01 01` / `01 02`）を直接送信しています。使用しているビットアクセス用メモリエリアコードは以下です。
+
+| エリア | コード |
+|---|---|
+| CIO | 0x30 |
+| W | 0x31 |
+| H | 0x32 |
+| A | 0x33 |
+| D | 0x02 |
+| E0〜 | 0x20 + バンク番号 |
+
+### 12.2 接続先ポートの上書き
+
+finscommandは接続先UDPポートが9600固定です（コンストラクタで指定不可）。`PlcClient.connect` で `client.addr = (host, port)` により `settings/plc_settings.yaml` の `connection.port` を反映しています。
+
+### 12.3 `__del__` のタイポバグ回避
+
+finscommand 0.1.3 の `fins.__del__` には `self.sock.cloase()` というタイポがあり（正しくは `close()`）、オブジェクト破棄のたびに `AttributeError` が発生します。プログラムは停止しませんが、stderrに `Exception ignored` 警告が出続け、ソケットも明示的に閉じられません。
+
+`PlcClient.__init__` 内の `_FinsUdpClient`（finsのサブクラス）で `__del__` を正しい実装に上書きして回避しています。上流リポジトリ（https://github.com/OkitaSystemDesign/finscommand ）へのissue報告を予定しています。上流で修正された場合もこのサブクラスは同じ動作をするだけなので、残しておいて問題ありません。

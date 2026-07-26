@@ -3,7 +3,7 @@ import json
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import numpy as np
 from asgiref.sync import async_to_sync
@@ -12,7 +12,6 @@ from PIL import Image
 
 from checker.applications.detect import detect_objects
 from checker.applications import plc_monitor
-from checker import checker_consumers
 from checker.applications.get_img import StillCamera
 from checker.applications.rfdetr_model import resolve_project_root_path
 from checker.applications.snap_service import encode_png_from_rgb_array
@@ -159,13 +158,11 @@ class StillCameraTests(TestCase):
 
 
 class PlcResultSignalTests(TestCase):
-    def _config(self):
+    def _result_signal(self):
         return {
-            "result_signal": {
-                "complete": {"area": "D", "word_address": 200, "bit": 0},
-                "ok": {"area": "D", "word_address": 200, "bit": 1},
-                "error": {"area": "D", "word_address": 200, "bit": 2},
-            }
+            "complete": {"area": "W", "word_address": 200, "bit": 0},
+            "ok": {"area": "W", "word_address": 200, "bit": 1},
+            "error": {"area": "W", "word_address": 200, "bit": 2},
         }
 
     def _client(self):
@@ -185,55 +182,118 @@ class PlcResultSignalTests(TestCase):
     def test_true_snap_result_sets_ok_and_clears_error(self):
         client = self._client()
 
-        with patch("checker.applications.plc_monitor.build_plc_client", return_value=client):
-            plc_monitor.write_snap_result_signals(SimpleNamespace(result=True), config=self._config())
+        plc_monitor.write_completed_result_signals(client, self._result_signal(), True)
 
         self.assertEqual(client.writes, [
-            ("D", 200, 1, 1),
-            ("D", 200, 2, 0),
-            ("D", 200, 0, 0),
+            ("W", 200, 1, 1),
+            ("W", 200, 2, 0),
+            ("W", 200, 0, 0),
         ])
-        self.assertTrue(client.closed)
 
     def test_false_snap_result_sets_error_and_clears_ok(self):
         client = self._client()
 
-        with patch("checker.applications.plc_monitor.build_plc_client", return_value=client):
-            plc_monitor.write_snap_result_signals(SimpleNamespace(result=False), config=self._config())
+        plc_monitor.write_completed_result_signals(client, self._result_signal(), False)
 
         self.assertEqual(client.writes, [
-            ("D", 200, 1, 0),
-            ("D", 200, 2, 1),
-            ("D", 200, 0, 1),
+            ("W", 200, 1, 0),
+            ("W", 200, 2, 1),
+            ("W", 200, 0, 1),
         ])
-        self.assertTrue(client.closed)
+
+
+# run_monitorはExceptionを捕捉してループを継続するため、
+# テストからループを抜けるにはBaseException継承が必要
+class StopMonitor(BaseException):
+    pass
+
+
+class PlcMonitorTriggerTests(TestCase):
+    """run_monitorの起動インターロックと立ち上がりエッジ検知のテスト。"""
+
+    def _config(self):
+        return {
+            "monitor": {"area": "W", "word_address": 100, "bit": 0, "poll_interval_seconds": 0.0},
+            "result_signal": {
+                "complete": {"area": "W", "word_address": 200, "bit": 0},
+                "ok": {"area": "W", "word_address": 200, "bit": 1},
+                "error": {"area": "W", "word_address": 200, "bit": 2},
+            },
+        }
+
+    def _client(self, trigger_reads):
+        class FakeClient:
+            def __init__(self):
+                self.trigger_reads = list(trigger_reads)
+                self.writes = []
+                self.bits = {("W", 200, 0): 1, ("W", 200, 1): 0, ("W", 200, 2): 0}
+                self.closed = False
+
+            def read_bit(self, area, word_address, bit):
+                if (area, word_address, bit) == ("W", 100, 0):
+                    if not self.trigger_reads:
+                        raise StopMonitor()
+                    return bool(self.trigger_reads.pop(0))
+                return bool(self.bits.get((area, word_address, bit), 0))
+
+            def write_bit(self, area, word_address, bit, value):
+                self.writes.append((area, word_address, bit, value))
+                self.bits[(area, word_address, bit)] = int(value)
+
+            def close(self):
+                self.closed = True
+
+        return FakeClient()
+
+    def _run_monitor(self, client):
+        # NG結果はcomplete=ONに戻るため、複数回のトリガー受付を検証できる
+        snap_result = SimpleNamespace(
+            result=False,
+            result_dict={"part": 0},
+            message="NG",
+            timestamp="2026-07-14T00:00:00",
+            image_bytes=b"png",
+        )
+        with (
+            patch("checker.applications.plc_monitor.load_config", return_value=self._config()),
+            patch("checker.applications.plc_monitor.build_plc_client", return_value=client),
+            patch("checker.applications.plc_monitor.is_snap_running", return_value=False),
+            patch("checker.applications.plc_monitor.run_checker_confirm_api", return_value=snap_result) as confirm_api,
+            patch("checker.applications.plc_monitor.notify_checker_status"),
+            patch("checker.applications.plc_monitor.time.sleep"),
+        ):
+            try:
+                plc_monitor.run_monitor()
+            except StopMonitor:
+                pass
+        plc_monitor.clear_latest_plc_result()
+        return confirm_api
+
+    def test_trigger_on_at_startup_is_ignored_until_off_is_confirmed(self):
+        # 起動時にtrigger=ONが残っている場合、OFFを確認してからの立ち上がりだけ実行する
+        client = self._client([1, 1, 0, 1])
+
+        confirm_api = self._run_monitor(client)
+
+        self.assertEqual(confirm_api.call_count, 1)
+
+    def test_trigger_level_on_does_not_retrigger(self):
+        # ONレベルが続いても、立ち上がりエッジ1回分しか実行しない
+        client = self._client([0, 1, 1, 1])
+
+        confirm_api = self._run_monitor(client)
+
+        self.assertEqual(confirm_api.call_count, 1)
+
+    def test_trigger_rising_edges_run_inspection_each_time(self):
+        client = self._client([0, 1, 0, 1])
+
+        confirm_api = self._run_monitor(client)
+
+        self.assertEqual(confirm_api.call_count, 2)
 
 
 class ConfirmApiTests(TestCase):
-    def test_confirm_api_writes_plc_signals_by_default(self):
-        snap_result = SimpleNamespace(result=True)
-
-        with (
-            patch("checker.checker_consumers.run_snap_backend", new=AsyncMock(return_value=snap_result)),
-            patch("checker.applications.plc_monitor.write_snap_result_signals") as write_signals,
-        ):
-            result = checker_consumers.run_confirm_snap_request_sync()
-
-        self.assertIs(result, snap_result)
-        write_signals.assert_called_once_with(snap_result)
-
-    def test_confirm_api_can_skip_plc_signal_write_for_plc_monitor_post_processing(self):
-        snap_result = SimpleNamespace(result=True)
-
-        with (
-            patch("checker.checker_consumers.run_snap_backend", new=AsyncMock(return_value=snap_result)),
-            patch("checker.applications.plc_monitor.write_snap_result_signals") as write_signals,
-        ):
-            result = checker_consumers.run_confirm_snap_request_sync(write_plc_signals=False)
-
-        self.assertIs(result, snap_result)
-        write_signals.assert_not_called()
-
     def test_plc_monitor_calls_confirm_websocket_api(self):
         class FakeWebSocket:
             def __init__(self):

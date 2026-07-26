@@ -140,4 +140,4 @@ CropProgress, CropTemplate
 
 ---
 
-（本設計書は2025年7月25日現在の実装に基づく）
+（`test-plc-server-bridge-to-CJ2` / `b6d2f2f` を2026年7月27日に再確認）

@@ -33,6 +33,7 @@ from django.apps import apps  # noqa: E402
 if not apps.ready and not getattr(apps, "loading", False):
     django.setup()
 
+from checker.applications.plc_client import PlcClient  # noqa: E402
 from checker.applications.snap_service import SnapResult, is_snap_running  # noqa: E402
 
 
@@ -109,103 +110,6 @@ class SingleInstanceLock:
         self.release()
 
 
-class PlcClient:
-    """Small adapter around the installed pyfins implementation."""
-
-    def __init__(self, connection_config):
-        try:
-            import pyfins
-        except ImportError as exc:
-            raise RuntimeError("pyfins がインストールされていません。依存関係をインストールしてください。") from exc
-
-        self.pyfins = pyfins
-        self.config = connection_config
-        self.client = None
-
-    def connect(self):
-        host = self.config["host"]
-        port = self.config.get("port", 9600)
-        timeout = self.config.get("timeout")
-
-        if hasattr(self.pyfins, "FinsClient"):
-            self.client = self.pyfins.FinsClient(host=host, port=port)
-        elif hasattr(self.pyfins, "UDPFinsConnection"):
-            self.client = self.pyfins.UDPFinsConnection()
-            self.client.connect(host)
-        elif hasattr(self.pyfins, "udp") and hasattr(self.pyfins.udp, "UDPFinsConnection"):
-            self.client = self.pyfins.udp.UDPFinsConnection()
-            self.client.connect(host)
-        else:
-            raise RuntimeError("対応している pyfins クライアントAPIが見つかりません。PlcClient adapterを実環境APIに合わせてください。")
-
-        self._set_attr_if_exists(("dest_node_add", "dest_node", "plc_node"), self.config.get("plc_node"))
-        self._set_attr_if_exists(("srce_node_add", "src_node", "pc_node"), self.config.get("pc_node"))
-        self._set_attr_if_exists(("timeout",), timeout)
-        return self
-
-    def close(self):
-        if self.client is None:
-            return
-        close = getattr(self.client, "close", None)
-        if callable(close):
-            close()
-
-    def read_bit(self, area, word_address, bit):
-        address = self._address(area, word_address, bit)
-
-        for method_name in ("memory_area_read", "read_memory", "read_bit", "read"):
-            method = getattr(self.client, method_name, None)
-            if not callable(method):
-                continue
-            try:
-                response = method(address)
-            except TypeError:
-                continue
-            return self._response_to_bit(response)
-
-        raise RuntimeError("pyfins client に対応する読取メソッドがありません。PlcClient.read_bit を実APIに合わせてください。")
-
-    def write_bit(self, area, word_address, bit, value):
-        address = self._address(area, word_address, bit)
-        payload = b"\x01" if int(value) else b"\x00"
-
-        for method_name in ("memory_area_write", "write_memory", "write_bit", "write"):
-            method = getattr(self.client, method_name, None)
-            if not callable(method):
-                continue
-            try:
-                method(address, payload)
-                return
-            except TypeError:
-                try:
-                    method(address, int(value))
-                    return
-                except TypeError:
-                    continue
-
-        raise RuntimeError("pyfins client に対応する書込メソッドがありません。PlcClient.write_bit を実APIに合わせてください。")
-
-    def _set_attr_if_exists(self, names, value):
-        if value is None or self.client is None:
-            return
-        for name in names:
-            if hasattr(self.client, name):
-                setattr(self.client, name, value)
-
-    @staticmethod
-    def _address(area, word_address, bit):
-        return f"{area}{int(word_address)}.{int(bit):02d}"
-
-    @staticmethod
-    def _response_to_bit(response):
-        data = getattr(response, "data", response)
-        if isinstance(data, (bytes, bytearray)):
-            return bool(data[-1])
-        if isinstance(data, (list, tuple)):
-            return bool(data[-1])
-        return bool(data)
-
-
 class TestServerPlcClient:
     """HTTP client for the root-level plc_test_server.py."""
 
@@ -268,12 +172,6 @@ def _signal_address(signal):
     return signal["area"], signal["word_address"], signal["bit"]
 
 
-def _write_signal(client, signal, value_key, default):
-    value = int(signal.get(value_key, default))
-    client.write_bit(*_signal_address(signal), value)
-    return value
-
-
 def notify_checker_status(payload):
     channel_layer = get_channel_layer()
     if channel_layer is None:
@@ -317,27 +215,12 @@ def _write_signal_value(client, signal, value):
     return int(value)
 
 
-def _ready_for_trigger(client, monitor, result_signal):
-    trigger_is_off = not client.read_bit(monitor["area"], monitor["word_address"], monitor["bit"])
-    complete_is_on = _read_signal(client, result_signal.get("complete") if result_signal else None, True)
-    return trigger_is_off and complete_is_on
-
-
 def clear_runtime_signals(client, monitor, result_signal):
     client.write_bit(monitor["area"], monitor["word_address"], monitor["bit"], 0)
     if not result_signal:
         return
     for name in ("complete", "ok", "error"):
         _write_signal_value(client, result_signal.get(name), 0)
-
-
-def set_ready_state(client, monitor, result_signal):
-    client.write_bit(monitor["area"], monitor["word_address"], monitor["bit"], 0)
-    if not result_signal:
-        return
-    _write_signal_value(client, result_signal.get("complete"), 1)
-    _write_signal_value(client, result_signal.get("ok"), 0)
-    _write_signal_value(client, result_signal.get("error"), 0)
 
 
 def write_completed_result_signals(client, result_signal, is_ok):
@@ -426,69 +309,6 @@ def reset_result_signals(config=None):
     return reset_targets
 
 
-def write_snap_result_signals(snap_result, config=None):
-    config = config or load_config()
-    client = build_plc_client(config)
-    if client is None:
-        logger.info("PLC and test server are disabled by settings. Snap result signal write is skipped.")
-        return [{
-            "name": "plc",
-            "skipped": True,
-            "reason": "PLC and test server are disabled in settings/plc_settings.yaml",
-        }]
-
-    result_signal = config.get("result_signal")
-    if not result_signal:
-        client.close()
-        return []
-
-    try:
-        write_completed_result_signals(client, result_signal, snap_result.result)
-    finally:
-        client.close()
-
-    return [{
-        "name": "ok",
-        "value": 1 if snap_result.result else 0,
-    }, {
-        "name": "error",
-        "value": 0 if snap_result.result else 1,
-    }, {
-        "name": "complete",
-        "value": 0 if snap_result.result else 1,
-    }]
-
-
-def write_snap_error_signals(config=None):
-    config = config or load_config()
-    client = build_plc_client(config)
-    if client is None:
-        logger.info("PLC and test server are disabled by settings. Snap error signal write is skipped.")
-        return [{
-            "name": "plc",
-            "skipped": True,
-            "reason": "PLC and test server are disabled in settings/plc_settings.yaml",
-        }]
-
-    result_signal = config.get("result_signal")
-    if not result_signal:
-        client.close()
-        return []
-
-    try:
-        write_error_result_signals(client, result_signal)
-    finally:
-        client.close()
-
-    return [{
-        "name": "error",
-        "value": 1,
-    }, {
-        "name": "complete",
-        "value": 1,
-    }]
-
-
 def get_confirm_websocket_url(config):
     checker_api = config.get("checker_api", {})
     return checker_api.get("confirm_ws_url", "ws://127.0.0.1:8000/checker/ws/confirm/")
@@ -548,9 +368,14 @@ def run_monitor():
 
     monitor = config["monitor"]
     result_signal = config.get("result_signal")
-    behavior = config.get("behavior", {})
     poll_interval = float(monitor.get("poll_interval_seconds", 1.0))
     last_connection_error_log = 0.0
+
+    # 起動インターロック: 電源再投入などでPLCに古いtrigger=ONが残っていても、
+    # 一度trigger=OFFを確認するまで検査を受け付けない
+    startup_armed = False
+    startup_wait_logged = False
+    previous_trigger = None
 
     logger.info(
         "PLC monitor started: %s%s.%02d",
@@ -568,15 +393,34 @@ def run_monitor():
                     continue
 
                 is_on = client.read_bit(monitor["area"], monitor["word_address"], monitor["bit"])
-                if is_on:
+
+                if not startup_armed:
+                    if is_on:
+                        if not startup_wait_logged:
+                            logger.warning(
+                                "PLC trigger is already ON at startup. Waiting for trigger=OFF before accepting requests."
+                            )
+                            startup_wait_logged = True
+                    else:
+                        startup_armed = True
+                        previous_trigger = False
+                        logger.info("PLC trigger is OFF. Startup interlock released. Trigger requests are now accepted.")
+                    time.sleep(poll_interval)
+                    continue
+
+                rising_edge = is_on and previous_trigger is False
+                previous_trigger = is_on
+
+                if rising_edge:
                     complete_is_on = _read_signal(client, result_signal.get("complete") if result_signal else None, True)
                     if not complete_is_on:
                         logger.warning("PLC trigger ignored because complete is OFF. Resetting trigger bit.")
                         client.write_bit(monitor["area"], monitor["word_address"], monitor["bit"], 0)
+                        previous_trigger = False
                         time.sleep(poll_interval)
                         continue
 
-                    logger.info("PLC trigger detected. Monitoring is paused while judgment is running.")
+                    logger.info("PLC trigger rising edge detected. Monitoring is paused while judgment is running.")
                     clear_runtime_signals(client, monitor, result_signal)
                     try:
                         snap_result = run_checker_confirm_api(config)
