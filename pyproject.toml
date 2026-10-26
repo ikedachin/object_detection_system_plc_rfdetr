@@ -20,7 +20,7 @@ dependencies = [
     "pip>=25.1.1",
     "pycocotools>=2.0.8",
     "pyyaml>=6.0.2",
-    "rfdetr[train,loggers]",
+    "rfdetr[train,loggers]==1.7.1",
     "supervision>=0.25.0",
     "uvicorn[standard]>=0.30.0",
     "websockets>=16.0",
